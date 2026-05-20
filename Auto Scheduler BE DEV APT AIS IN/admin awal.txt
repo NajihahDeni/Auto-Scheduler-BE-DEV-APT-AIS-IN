@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Build Plan Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+    <!-- ===== USER BAR ===== -->
+    <div class="user-bar" id="user-bar">
+        <div class="user-bar-left">
+            <div class="user-avatar" id="user-avatar">?</div>
+            <div class="user-info">
+                <div class="user-name" id="user-name">Loading...</div>
+                <div class="user-role" id="user-role"></div>
+            </div>
+        </div>
+        <button class="logout-btn" onclick="logout()">
+            &#128275; Logout
+        </button>
+    </div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <div class="logo-icon">&#9881;</div>
+                <div>
+                    <div class="header-title">PJM Build Plan</div>
+                    <div class="header-subtitle">Project Management System</div>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="header-stats">
+                <div class="stat-badge" id="badge-total">
+                    <span>Total Projects:</span>
+                    <span class="stat-num" id="stat-total">0</span>
+                </div>
+                <div class="stat-badge" id="badge-week">
+                    <span>This Week:</span>
+                    <span class="stat-num" id="stat-week">0</span>
+                </div>
+                <div class="stat-badge" id="badge-equipment">
+                    <span>Equipment In Use:</span>
+                    <span class="stat-num" id="stat-equipment">0</span>
+                </div>
+            </div>
+            <div class="current-date" id="current-date"></div>
+        </div>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <div class="main-container">
+
+        <!-- ===== SIDEBAR FORM ===== -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-icon">&#10010;</span>
+                <h2>Add New Build Plan</h2>
+            </div>
+            <div class="form-scroll">
+                <form id="project-form" novalidate>
+
+                    <!-- Project Info -->
+                    <div class="section-divider">
+                        <span class="section-label">Project Info</span>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            PJM Name <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-pjm"
+                            placeholder="e.g., PJM-2024-001">
+                        <div class="error-msg" id="err-pjm"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Project Title <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-title"
+                            placeholder="Enter project title">
+                        <div class="error-msg" id="err-title"></div>
+                    </div>
+
+                    <!-- Equipment Combobox -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Equipment <span class="field-required">*</span>
+                        </label>
+                        <div class="equipment-mode-bar">
+                            <span class="equipment-mode-label"
+                                id="equipment-mode-label">
+                                &#128269; Choose from list
+                            </span>
+                        </div>
+                        <div class="combo-wrapper" id="equipment-combo-wrapper">
+                            <input type="text"
+                                class="form-input"
+                                id="f-equipment"
+                                placeholder="Select or search equipment…"
+                                autocomplete="off">
+                            <div class="combo-dropdown hidden"
+                                id="equipment-dropdown">
+                                <div class="combo-option"
+                                    data-value="Equipment A - Machine 01">
+                                    Equipment A - Machine 01
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment B - Machine 02">
+                                    Equipment B - Machine 02
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment C - Machine 03">
+                                    Equipment C - Machine 03
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment D - Analyzer 01">
+                                    Equipment D - Analyzer 01
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment E - Analyzer 02">
+                                    Equipment E - Analyzer 02
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment F - Tester 01">
+                                    Equipment F - Tester 01
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment G - Tester 02">
+                                    Equipment G - Tester 02
+                                </div>
+                                <div class="combo-option"
+                                    data-value="Equipment H - Scanner 01">
+                                    Equipment H - Scanner 01
+                                </div>
+                            </div>
+                        </div>
+                        <div class="error-msg" id="err-equipment"></div>
+                    </div>
+
+                    <!-- PIC -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Unit Process Development (UPD)
+                            <span class="field-required">*</span>
+                        </label>
+                        <input type="text"
+                            class="form-input"
+                            id="f-pic"
+                            placeholder="Enter full name of person in charge…"
+                            autocomplete="off"
+                            oninput="liveConflictCheck()">
+                        <div class="error-msg" id="err-pic"></div>
+                    </div>
+
+                    <!-- Schedule -->
+                    <div class="section-divider">
+                        <span class="section-label">Schedule</span>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Start Date &amp; Time
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-start-date"
+                                onchange="liveConflictCheck()">
+                            <select class="form-select time-select"
+                                id="f-start-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-start"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            End Date &amp; Time
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-end-date"
+                                onchange="liveConflictCheck()">
+                            <select class="form-select time-select"
+                                id="f-end-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-end"></div>
+                    </div>
+
+                    <!-- Live Clash Alert -->
+                    <div id="live-conflict-box" class="live-conflict-box hidden">
+                        <div class="live-conflict-title">
+                            &#9888; Scheduling Clash Detected
+                        </div>
+                        <div id="live-conflict-list"></div>
+                    </div>
+
+                    <!-- Sample Info -->
+                    <div class="section-divider">
+                        <span class="section-label">Sample Information</span>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Quantity
+                            <span class="field-required">*</span>
+                        </label>
+                        <input type="number" class="form-input" id="f-qty"
+                            placeholder="e.g., 100" min="1"
+                            oninput="adminCheckLimitWarnings()">
+                        <!-- inline qty warning -->
+                        <div class="limit-warning-banner" id="warn-qty">
+                            <span class="warn-icon">&#9888;&#65039;</span>
+                            <span id="warn-qty-msg"></span>
+                        </div>
+                        <div class="error-msg" id="err-qty"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            No. of Lot
+                            <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-lot"
+                            placeholder="e.g., LOT-2024-001">
+                        <!-- inline lot warning -->
+                        <div class="limit-warning-banner" id="warn-lot">
+                            <span class="warn-icon">&#9888;&#65039;</span>
+                            <span id="warn-lot-msg"></span>
+                        </div>
+                        <div class="error-msg" id="err-lot"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">Special Instructions (Optional)</label>
+                        <textarea class="form-textarea" id="f-notes"
+                            placeholder="Additional notes..."></textarea>
+                    </div>
+
+                    <!-- inline project warning (bottom of form) -->
+                    <div class="limit-warning-banner" id="warn-proj">
+                        <span class="warn-icon">&#9888;&#65039;</span>
+                        <span id="warn-proj-msg"></span>
+                    </div>
+
+                </form>
+            </div>
+            <div class="form-buttons">
+                <button class="btn btn-success" id="save-btn"
+                    onclick="saveProject()">
+                    &#128190; Save Project
+                </button>
+                <button class="btn btn-ghost" onclick="clearForm()">
+                    &#8635; Clear Form
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===== RIGHT CONTENT ===== -->
+        <div class="right-content">
+
+            <!-- Tabs -->
+            <div class="tabs-header">
+                <button class="tab-btn active"
+                    onclick="switchTab('calendar')"
+                    id="tab-calendar">
+                    &#128197; Weekly Calendar
+                </button>
+                <button class="tab-btn"
+                    onclick="switchTab('list')"
+                    id="tab-list">
+                    &#128203; Project List
+                </button>
+                <!-- Hidden until admin role confirmed -->
+                <button class="tab-btn admin-tab"
+                    onclick="switchTab('limits')"
+                    id="tab-limits"
+                    style="display:none;">
+                    &#127919; Weekly Limits
+                    <span class="admin-only-badge">ADMIN</span>
+                </button>
+            </div>
+
+            <!-- ===== CALENDAR TAB ===== -->
+            <div class="tab-content active" id="tab-content-calendar">
+                <div class="calendar-nav">
+                    <div class="cal-nav-btns">
+                        <button class="btn btn-ghost btn-sm"
+                            onclick="prevWeek()">
+                            &#9664; Prev
+                        </button>
+                        <button class="btn btn-accent2 btn-sm"
+                            onclick="goToToday()">
+                            Today
+                        </button>
+                        <button class="btn btn-ghost btn-sm"
+                            onclick="nextWeek()">
+                            Next &#9654;
+                        </button>
+                    </div>
+                    <div class="calendar-nav-center">
+                        <div class="week-label" id="week-label">
+                            Loading...
+                        </div>
+                    </div>
+                    <div class="calendar-legend" id="calendar-legend"></div>
+                </div>
+                <div class="calendar-wrapper">
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                </div>
+            </div>
+
+            <!-- ===== LIST TAB ===== -->
+            <div class="tab-content" id="tab-content-list">
+                <div class="list-toolbar">
+                    <div class="list-toolbar-left">
+                        <div class="search-box">
+                            <span class="search-icon">&#128269;</span>
+                            <input type="text" id="search-input"
+                                placeholder="Search projects..."
+                                oninput="filterProjects()">
+                        </div>
+                        <select class="filter-select"
+                            id="filter-equipment"
+                            onchange="filterProjects()">
+                            <option value="">All Equipment</option>
+                        </select>
+                        <select class="filter-select"
+                            id="filter-pic"
+                            onchange="filterProjects()">
+                            <option value="">All UPD</option>
+                        </select>
+                    </div>
+                    <div class="list-toolbar-right">
+                        <span id="selected-count" class="selected-count"></span>
+                        <button class="btn btn-danger btn-sm"
+                            onclick="deleteSelected()">
+                            &#128465; Delete Selected
+                        </button>
+                        <button class="btn btn-ghost btn-sm"
+                            onclick="exportCSV()">
+                            &#128228; Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="project-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-cell">
+                                    <input type="checkbox"
+                                        id="select-all"
+                                        onchange="toggleSelectAll()">
+                                </th>
+                                <th data-col="rowNum">#</th>
+                                <th onclick="sortTable('pjm')"
+                                    data-col="pjm">PJM Name</th>
+                                <th onclick="sortTable('title')"
+                                    data-col="title">Project Title</th>
+                                <th onclick="sortTable('equipment')"
+                                    data-col="equipment">Equipment</th>
+                                <th onclick="sortTable('pic')"
+                                    data-col="upd">UPD</th>
+                                <th onclick="sortTable('start')"
+                                    data-col="start">Start</th>
+                                <th onclick="sortTable('end')"
+                                    data-col="end">End</th>
+                                <th onclick="sortTable('qty')"
+                                    data-col="qty">Qty</th>
+                                <th onclick="sortTable('lot')"
+                                    data-col="lot">No. of Lot</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="project-tbody"></tbody>
+                    </table>
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-icon">&#128203;</div>
+                        <div class="empty-title">No Projects Found</div>
+                        <div class="empty-desc">
+                            Add a new project using the form on the left
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== LIMITS TAB (ADMIN ONLY) ===== -->
+            <div class="tab-content" id="tab-content-limits">
+                <div class="limits-panel">
+
+                    <!-- Banner -->
+                    <div class="admin-alert-banner">
+                        <span class="alert-icon">&#128272;</span>
+                        <div>
+                            <strong>Sample Coordinator Only — Weekly Limits Control</strong><br>
+                            Set the maximum number of projects, lots, and total
+                            quantity allowed per week. PJM will be blocked
+                            or warned when limits are reached.
+                        </div>
+                    </div>
+
+                    <!-- ── SECTION 1: Set Limits ── -->
+                    <div class="limit-section-card">
+                        <div class="limit-section-title">
+                            <span class="section-icon">&#128197;</span>
+                            Weekly Limit Configuration
+                            <span class="section-desc">
+                                Manual values — applied immediately on save
+                            </span>
+                        </div>
+                        <div class="limit-section-body">
+
+                            <!-- Week picker -->
+                            <div class="week-picker-row">
+                                <label>&#128197; Apply to Week:</label>
+                                <button type="button" class="week-nav-btn"
+                                    onclick="adminWeekNav(-1)">
+                                    &#9664;
+                                </button>
+                                <input type="week" id="admin-week-input">
+                                <button type="button" class="week-nav-btn"
+                                    onclick="adminWeekNav(1)">
+                                    &#9654;
+                                </button>
+                                <button type="button" class="week-today-btn"
+                                    onclick="adminWeekSetCurrent()">
+                                    Current Week
+                                </button>
+                            </div>
+                            <div class="current-week-label"
+                                id="admin-week-display"></div>
+
+                            <!-- Three manual input boxes -->
+                            <div class="limit-boxes-grid">
+
+                                <!-- NO. OF LOTS -->
+                                <div class="limit-box" id="limitbox-lot">
+                                    <div class="limit-box-icon">&#128230;</div>
+                                    <div class="limit-box-label">
+                                        Max No. of Lots
+                                    </div>
+                                    <div class="limit-manual-input-wrap">
+                                        <input
+                                            type="number"
+                                            class="limit-manual-input"
+                                            id="admin-lot-limit"
+                                            value="50"
+                                            min="1"
+                                            max="9999"
+                                            placeholder="e.g. 50"
+                                            oninput="adminOnLimitInput()">
+                                        <span class="limit-manual-unit">
+                                            lots / week
+                                        </span>
+                                    </div>
+                                    <label class="unlimited-toggle">
+                                        <input type="checkbox"
+                                            id="unlimited-lot"
+                                            onchange="adminToggleUnlimited('lot')">
+                                        No limit &#9854;&#65039;
+                                    </label>
+                                    <div class="limit-usage-row">
+                                        <span>Used this week:</span>
+                                        <span class="usage-val"
+                                            id="usage-lot-val">—</span>
+                                    </div>
+                                    <div class="limit-progress-bar">
+                                        <div class="limit-progress-fill"
+                                            id="progress-lot"
+                                            style="width:0%;
+                                            background:#3b82f6;">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- QUANTITY -->
+                                <div class="limit-box" id="limitbox-qty">
+                                    <div class="limit-box-icon">&#128290;</div>
+                                    <div class="limit-box-label">
+                                        Max Total Quantity
+                                    </div>
+                                    <div class="limit-manual-input-wrap">
+                                        <input
+                                            type="number"
+                                            class="limit-manual-input"
+                                            id="admin-qty-limit"
+                                            value="1000"
+                                            min="1"
+                                            max="999999"
+                                            placeholder="e.g. 1000"
+                                            oninput="adminOnLimitInput()">
+                                        <span class="limit-manual-unit">
+                                            units / week
+                                        </span>
+                                    </div>
+                                    <label class="unlimited-toggle">
+                                        <input type="checkbox"
+                                            id="unlimited-qty"
+                                            onchange="adminToggleUnlimited('qty')">
+                                        No limit &#9854;&#65039;
+                                    </label>
+                                    <div class="limit-usage-row">
+                                        <span>Used this week:</span>
+                                        <span class="usage-val"
+                                            id="usage-qty-val">—</span>
+                                    </div>
+                                    <div class="limit-progress-bar">
+                                        <div class="limit-progress-fill"
+                                            id="progress-qty"
+                                            style="width:0%;
+                                            background:#22c55e;">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- NO. OF PROJECTS -->
+                                <div class="limit-box" id="limitbox-proj">
+                                    <div class="limit-box-icon">&#128193;</div>
+                                    <div class="limit-box-label">
+                                        Max No. of Projects
+                                    </div>
+                                    <div class="limit-manual-input-wrap">
+                                        <input
+                                            type="number"
+                                            class="limit-manual-input"
+                                            id="admin-proj-limit"
+                                            value="10"
+                                            min="1"
+                                            max="9999"
+                                            placeholder="e.g. 10"
+                                            oninput="adminOnLimitInput()">
+                                        <span class="limit-manual-unit">
+                                            projects / week
+                                        </span>
+                                    </div>
+                                    <label class="unlimited-toggle">
+                                        <input type="checkbox"
+                                            id="unlimited-proj"
+                                            onchange="adminToggleUnlimited('proj')">
+                                        No limit &#9854;&#65039;
+                                    </label>
+                                    <div class="limit-usage-row">
+                                        <span>Used this week:</span>
+                                        <span class="usage-val"
+                                            id="usage-proj-val">—</span>
+                                    </div>
+                                    <div class="limit-progress-bar">
+                                        <div class="limit-progress-fill"
+                                            id="progress-proj"
+                                            style="width:0%;
+                                            background:#f59e0b;">
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div><!-- /limit-boxes-grid -->
+
+                            <!-- Save row -->
+                            <div class="limits-action-row">
+                                <div class="left-btns">
+                                    <button type="button"
+                                        class="btn-limit-reset"
+                                        onclick="adminResetToDefaults()">
+                                        &#128260; Reset Defaults
+                                    </button>
+                                    <button type="button"
+                                        class="btn-limit-reset"
+                                        onclick="adminCopyLastWeek()">
+                                        &#128203; Copy Last Week
+                                    </button>
+                                </div>
+                                <button type="button"
+                                    class="btn-limit-save"
+                                    onclick="adminSaveLimits()">
+                                    &#9989; Apply Limits
+                                </button>
+                            </div>
+
+                        </div><!-- /body -->
+                    </div><!-- /card -->
+
+                    <!-- ── SECTION 2: Enforcement ── -->
+                    <div class="limit-section-card">
+                        <div class="limit-section-title">
+                            <span class="section-icon">&#9881;&#65039;</span>
+                            Enforcement Options
+                            <span class="section-desc">
+                                Behaviour when a limit is reached
+                            </span>
+                        </div>
+                        <div class="limit-section-body">
+                            <div class="enforce-grid">
+
+                                <div class="enforce-row">
+                                    <div>
+                                        <div class="enforce-row-label">
+                                            &#128683; Block submissions at lot limit
+                                        </div>
+                                        <div class="enforce-row-desc">
+                                            Prevent saving once max lots reached
+                                        </div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                            id="enforce-block-lot" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="enforce-row">
+                                    <div>
+                                        <div class="enforce-row-label">
+                                            &#128683; Block submissions at qty limit
+                                        </div>
+                                        <div class="enforce-row-desc">
+                                            Prevent saving once max qty reached
+                                        </div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                            id="enforce-block-qty" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="enforce-row">
+                                    <div>
+                                        <div class="enforce-row-label">
+                                            &#128683; Block submissions at project limit
+                                        </div>
+                                        <div class="enforce-row-desc">
+                                            Prevent saving once max projects reached
+                                        </div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                            id="enforce-block-proj" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="enforce-row">
+                                    <div>
+                                        <div class="enforce-row-label">
+                                            &#9888;&#65039; Warn at 80% usage
+                                        </div>
+                                        <div class="enforce-row-desc">
+                                            Show inline warning before limit hit
+                                        </div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                            id="enforce-warn-80" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="enforce-row">
+                                    <div>
+                                        <div class="enforce-row-label">
+                                            &#128260; Auto-reset every Monday
+                                        </div>
+                                        <div class="enforce-row-desc">
+                                            Carry current limits to next week
+                                        </div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                            id="enforce-auto-reset" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="enforce-row">
+                                    <div>
+                                        <div class="enforce-row-label">
+                                            &#128226; Colour header badges
+                                        </div>
+                                        <div class="enforce-row-desc">
+                                            Highlight stats when near / over limit
+                                        </div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                            id="enforce-header-badge" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                            </div><!-- /enforce-grid -->
+                            <div class="enforce-save-row">
+                                <button type="button"
+                                    class="btn-limit-save"
+                                    onclick="adminSaveEnforcement()">
+                                    &#128190; Save Options
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── SECTION 3: Presets ── -->
+                    <div class="limit-section-card">
+                        <div class="limit-section-title">
+                            <span class="section-icon">&#9889;</span>
+                            Quick Presets
+                            <span class="section-desc">
+                                Fill the fields above with one click
+                            </span>
+                        </div>
+                        <div class="limit-section-body">
+                            <div class="presets-row">
+                                <button type="button"
+                                    class="preset-btn preset-conservative"
+                                    onclick="adminApplyPreset('conservative')">
+                                    <span>&#128993;</span>
+                                    <div>
+                                        <div>Conservative</div>
+                                        <div class="preset-detail">
+                                            Lots:&nbsp;20 &middot;
+                                            Qty:&nbsp;500 &middot;
+                                            Projects:&nbsp;5
+                                        </div>
+                                    </div>
+                                </button>
+                                <button type="button"
+                                    class="preset-btn preset-standard"
+                                    onclick="adminApplyPreset('standard')">
+                                    <span>&#128994;</span>
+                                    <div>
+                                        <div>Standard</div>
+                                        <div class="preset-detail">
+                                            Lots:&nbsp;50 &middot;
+                                            Qty:&nbsp;1,000 &middot;
+                                            Projects:&nbsp;10
+                                        </div>
+                                    </div>
+                                </button>
+                                <button type="button"
+                                    class="preset-btn preset-aggressive"
+                                    onclick="adminApplyPreset('aggressive')">
+                                    <span>&#128308;</span>
+                                    <div>
+                                        <div>Aggressive</div>
+                                        <div class="preset-detail">
+                                            Lots:&nbsp;100 &middot;
+                                            Qty:&nbsp;5,000 &middot;
+                                            Projects:&nbsp;20
+                                        </div>
+                                    </div>
+                                </button>
+                                <button type="button"
+                                    class="preset-btn preset-unlimited"
+                                    onclick="adminApplyPreset('unlimited')">
+                                    <span>&#9854;&#65039;</span>
+                                    <div>
+                                        <div>Unlimited</div>
+                                        <div class="preset-detail">
+                                            Disable all limits
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── SECTION 4: History ── -->
+                    <div class="limit-section-card">
+                        <div class="limit-section-title">
+                            <span class="section-icon">&#128202;</span>
+                            Limit History
+                            <span class="section-desc">
+                                Previously saved configurations
+                            </span>
+                        </div>
+                        <div class="limit-section-body
+                            limit-section-body--flush">
+                            <div class="history-table-wrap">
+                                <table class="limit-history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Week</th>
+                                            <th>Lot Limit</th>
+                                            <th>Qty Limit</th>
+                                            <th>Project Limit</th>
+                                            <th>Lots Used</th>
+                                            <th>Qty Used</th>
+                                            <th>Projects Used</th>
+                                            <th>Saved On</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="limit-history-tbody">
+                                        <tr>
+                                            <td colspan="9"
+                                                class="history-empty">
+                                                No history yet — apply a
+                                                configuration to record it here.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /limits-panel -->
+            </div><!-- /tab-content-limits -->
+
+        </div><!-- /right-content -->
+    </div><!-- /main-container -->
+
+    <!-- ===== DETAIL MODAL ===== -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal">
+            <div class="modal-header" id="modal-header">
+                <div>
+                    <div class="modal-title" id="modal-title"></div>
+                    <div class="modal-subtitle" id="modal-subtitle"></div>
+                </div>
+                <button class="modal-close"
+                    onclick="closeModal('detail-modal')">
+                    &#10005;
+                </button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer"></div>
+        </div>
+    </div>
+
+    <!-- ===== CLASH BLOCK MODAL ===== -->
+    <div class="modal-overlay" id="clash-modal">
+        <div class="modal">
+            <div class="modal-header clash-modal-header">
+                <div>
+                    <div class="modal-title">&#128683; Save Blocked</div>
+                    <div class="modal-subtitle">
+                        Resolve all clashes before saving
+                    </div>
+                </div>
+                <button class="modal-close"
+                    onclick="closeModal('clash-modal')">
+                    &#10005;
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="clash-modal-content"></div>
+                <div class="clash-instruction">
+                    Please change the <strong>Equipment</strong>,
+                    <strong>UPD</strong>, or <strong>schedule</strong>
+                    to resolve these clashes before saving.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"
+                    onclick="closeModal('clash-modal')">
+                    &#8592; Go Back &amp; Edit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== LIMIT BLOCKED MODAL ===== -->
+    <div class="modal-overlay" id="limit-modal">
+        <div class="modal">
+            <div class="modal-header modal-header--danger">
+                <div>
+                    <div class="modal-title">
+                        &#128683; Weekly Limit Reached
+                    </div>
+                    <div class="modal-subtitle">
+                        This submission cannot proceed
+                    </div>
+                </div>
+                <button class="modal-close"
+                    onclick="closeModal('limit-modal')">
+                    &#10005;
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="limit-modal-content"></div>
+                <div class="clash-instruction clash-instruction--danger">
+                    Contact your <strong>Sample Coordinator</strong> to raise the limit,
+                    or wait for the weekly reset.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"
+                    onclick="closeModal('limit-modal')">
+                    &#8592; Go Back
+                </button>
+            </div>z
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- script.js MUST load before admin.js -->
+    <script src="script.js"></script>
+    <script src="admin.js"></script>
+
+</body>
+</html>

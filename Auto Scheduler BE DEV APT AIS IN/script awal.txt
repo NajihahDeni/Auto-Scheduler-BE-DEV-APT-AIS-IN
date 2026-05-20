@@ -1,0 +1,1688 @@
+// =============================================
+// STATE
+// =============================================
+let projects         = [];
+let currentWeekStart = getWeekStart(new Date());
+let sortConfig       = { col: 'start', dir: 'asc' };
+let editingId        = null;
+let rowCounter       = 1;
+
+const SLOT_H    = 52;
+const CAL_START = 0;
+const CAL_END   = 23;
+
+const PROJECT_COLORS = [
+    '#7c3aed','#06b6d4','#10b981','#f59e0b',
+    '#ef4444','#8b5cf6','#0ea5e9','#14b8a6',
+    '#f97316','#ec4899','#6366f1','#84cc16',
+    '#3b82f6','#a855f7','#22c55e','#eab308'
+];
+
+// Predefined equipment list for dropdown suggestions
+const EQUIPMENT_LIST = [
+    'Equipment A - Machine 01',
+    'Equipment B - Machine 02',
+    'Equipment C - Machine 03',
+    'Equipment D - Analyzer 01',
+    'Equipment E - Analyzer 02',
+    'Equipment F - Tester 01',
+    'Equipment G - Tester 02',
+    'Equipment H - Scanner 01',
+];
+
+// =============================================
+// INIT
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    initTimeSelects();
+    setDefaultDates();
+    updateCurrentDate();
+    renderCalendar();
+    updateStats();
+    setInterval(updateCurrentDate, 60000);
+    setInterval(updateCurrentTimeLine, 60000);
+
+    // Table action delegation
+    document.getElementById('project-tbody')
+        .addEventListener('click', handleTableClick);
+
+    // Close equipment dropdown when clicking outside
+    document.addEventListener('click', handleOutsideClick);
+
+    // Keyboard navigation for equipment dropdown
+    document.getElementById('f-equipment')
+        .addEventListener('keydown', handleEquipmentKeydown);
+
+    loadDemoData();
+});
+
+// =============================================
+// EQUIPMENT COMBOBOX
+// =============================================
+function showEquipmentDropdown() {
+    const dropdown =
+        document.getElementById('equipment-dropdown');
+    const input =
+        document.getElementById('f-equipment');
+
+    // Reset all options visibility
+    resetEquipmentOptions();
+    dropdown.classList.remove('hidden');
+
+    // Remove old "no result" if present
+    const noResult = dropdown.querySelector('.combo-no-result');
+    if (noResult) noResult.remove();
+}
+
+function filterEquipmentDropdown() {
+    const input    =
+        document.getElementById('f-equipment');
+    const query    = input.value.toLowerCase().trim();
+    const dropdown =
+        document.getElementById('equipment-dropdown');
+    const options  =
+        dropdown.querySelectorAll('.combo-option');
+
+    dropdown.classList.remove('hidden');
+
+    // Remove old "no result"
+    const noResult = dropdown.querySelector('.combo-no-result');
+    if (noResult) noResult.remove();
+
+    let visibleCount = 0;
+
+    options.forEach(opt => {
+        const match =
+            opt.dataset.value.toLowerCase().includes(query);
+        if (match) {
+            opt.classList.remove('hidden-opt');
+            visibleCount++;
+        } else {
+            opt.classList.add('hidden-opt');
+        }
+    });
+
+    // Show "no match" hint but keep typed value
+    if (visibleCount === 0 && query.length > 0) {
+        const hint     = document.createElement('div');
+        hint.className = 'combo-no-result';
+        hint.textContent =
+            `Using custom: "${input.value}"`;
+        dropdown.appendChild(hint);
+    }
+
+    // Fire clash check after typing
+    liveConflictCheck();
+}
+
+function selectEquipmentOption(value) {
+    const input =
+        document.getElementById('f-equipment');
+    input.value = value;
+    hideEquipmentDropdown();
+
+    // Clear error state
+    input.classList.remove('error');
+    const err = document.getElementById('err-equipment');
+    if (err) { err.textContent = ''; err.classList.remove('show'); }
+
+    liveConflictCheck();
+}
+
+function hideEquipmentDropdown() {
+    document.getElementById('equipment-dropdown')
+        .classList.add('hidden');
+    resetEquipmentOptions();
+}
+
+function resetEquipmentOptions() {
+    document.querySelectorAll(
+        '#equipment-dropdown .combo-option'
+    ).forEach(opt => opt.classList.remove('hidden-opt'));
+
+    const noResult = document
+        .getElementById('equipment-dropdown')
+        .querySelector('.combo-no-result');
+    if (noResult) noResult.remove();
+}
+
+function handleOutsideClick(e) {
+    const wrapper = document.querySelector('.combo-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        hideEquipmentDropdown();
+    }
+}
+
+function handleEquipmentKeydown(e) {
+    const dropdown =
+        document.getElementById('equipment-dropdown');
+    if (dropdown.classList.contains('hidden')) return;
+
+    const visible = [
+        ...dropdown.querySelectorAll(
+            '.combo-option:not(.hidden-opt)'
+        )
+    ];
+    if (!visible.length) return;
+
+    const highlighted =
+        dropdown.querySelector('.combo-option.highlighted');
+    let idx = visible.indexOf(highlighted);
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (highlighted) highlighted.classList.remove('highlighted');
+        idx = (idx + 1) % visible.length;
+        visible[idx].classList.add('highlighted');
+        visible[idx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (highlighted) highlighted.classList.remove('highlighted');
+        idx = (idx - 1 + visible.length) % visible.length;
+        visible[idx].classList.add('highlighted');
+        visible[idx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlighted) {
+            selectEquipmentOption(highlighted.dataset.value);
+        } else {
+            hideEquipmentDropdown();
+        }
+    } else if (e.key === 'Escape') {
+        hideEquipmentDropdown();
+    }
+}
+
+// Wire up option clicks (called once on DOMContentLoaded
+// via delegation on the dropdown div)
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('equipment-dropdown')
+        .addEventListener('click', e => {
+            const opt = e.target.closest('.combo-option');
+            if (opt) selectEquipmentOption(opt.dataset.value);
+        });
+});
+
+// =============================================
+// TABLE CLICK DELEGATION
+// =============================================
+function handleTableClick(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    const id     = btn.closest('tr')?.dataset.id;
+    const action = btn.dataset.action;
+    if (!id) return;
+
+    if (action === 'view')   showProjectDetail(id);
+    if (action === 'edit')   editProject(id);
+    if (action === 'delete') deleteProject(id);
+}
+
+// =============================================
+// DEMO DATA
+// =============================================
+function loadDemoData() {
+    const today = new Date();
+    const fmt   = d => d.toISOString().split('T')[0];
+    const add   = n => new Date(today.getTime() + n * 86400000);
+
+    const demos = [
+        {
+            pjm:'PJM-2024-001', title:'Motor Assembly Test',
+            equipment:'Equipment A - Machine 01', pic:'Ahmad Rizki',
+            startDate:fmt(today), startTime:'08:00',
+            endDate:fmt(today),   endTime:'12:00',
+            qty:'50', lot:'LOT-2024-001',
+            notes:'Initial motor test run'
+        },
+        {
+            pjm:'PJM-2024-002', title:'Circuit Board Analysis',
+            equipment:'Equipment D - Analyzer 01', pic:'Budi Santoso',
+            startDate:fmt(today), startTime:'13:00',
+            endDate:fmt(add(1)),  endTime:'17:00',
+            qty:'30', lot:'LOT-2024-002',
+            notes:'PCB inspection batch 1'
+        },
+        {
+            pjm:'PJM-2024-003', title:'Quality Control Scan',
+            equipment:'Equipment H - Scanner 01', pic:'Citra Dewi',
+            startDate:fmt(add(1)), startTime:'09:00',
+            endDate:fmt(add(2)),   endTime:'16:00',
+            qty:'100', lot:'LOT-2024-003',
+            notes:'Weekly QC scan'
+        },
+        {
+            pjm:'PJM-2024-004', title:'Night-shift Stress Test',
+            equipment:'Equipment C - Machine 03', pic:'Dian Pratama',
+            startDate:fmt(add(2)), startTime:'22:00',
+            endDate:fmt(add(3)),   endTime:'06:00',
+            qty:'25', lot:'LOT-2024-004',
+            notes:'Overnight endurance run'
+        }
+    ];
+
+    demos.forEach((d, i) => {
+        projects.push({
+            id        : `demo_${i}`,
+            pjm       : d.pjm,
+            title     : d.title,
+            equipment : d.equipment,
+            pic       : d.pic,
+            startDate : d.startDate,
+            startTime : d.startTime,
+            endDate   : d.endDate,
+            endTime   : d.endTime,
+            startDt   : new Date(`${d.startDate}T${d.startTime}`),
+            endDt     : new Date(`${d.endDate}T${d.endTime}`),
+            qty       : d.qty,
+            lot       : d.lot,
+            notes     : d.notes,
+            color     : PROJECT_COLORS[i % PROJECT_COLORS.length],
+            rowNum    : rowCounter++
+        });
+    });
+
+    refreshAll();
+}
+
+// =============================================
+// TIME SELECTS
+// =============================================
+function initTimeSelects() {
+    const times = [];
+    for (let h = 0; h < 24; h++) {
+        for (const m of [0, 30]) {
+            times.push(
+                `${String(h).padStart(2,'0')}:` +
+                `${String(m).padStart(2,'0')}`
+            );
+        }
+    }
+    ['f-start-time', 'f-end-time'].forEach((id, idx) => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '';
+        times.forEach(t => {
+            const opt       = document.createElement('option');
+            opt.value       = t;
+            opt.textContent = t;
+            sel.appendChild(opt);
+        });
+        sel.value = idx === 0 ? '08:00' : '17:00';
+    });
+}
+
+function setDefaultDates() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('f-start-date').value = today;
+    document.getElementById('f-end-date').value   = today;
+}
+
+// =============================================
+// LIVE CLASH CHECK
+// =============================================
+function liveConflictCheck() {
+    const equipment =
+        document.getElementById('f-equipment').value.trim();
+    const pic =
+        document.getElementById('f-pic').value.trim();
+    const startDate =
+        document.getElementById('f-start-date').value;
+    const startTime =
+        document.getElementById('f-start-time').value;
+    const endDate =
+        document.getElementById('f-end-date').value;
+    const endTime =
+        document.getElementById('f-end-time').value;
+
+    const box  = document.getElementById('live-conflict-box');
+    const list = document.getElementById('live-conflict-list');
+
+    clearClashHighlights();
+
+    if (!equipment || !pic || !startDate || !endDate) {
+        box.classList.add('hidden');
+        list.innerHTML = '';
+        enableSaveButton();
+        return;
+    }
+
+    const startDt = new Date(`${startDate}T${startTime}`);
+    const endDt   = new Date(`${endDate}T${endTime}`);
+
+    if (isNaN(startDt) || isNaN(endDt) || startDt >= endDt) {
+        box.classList.add('hidden');
+        list.innerHTML = '';
+        enableSaveButton();
+        return;
+    }
+
+    const clashes = detectClashes(
+        equipment, pic, startDt, endDt, editingId
+    );
+
+    if (!clashes.length) {
+        box.classList.add('hidden');
+        list.innerHTML = '';
+        enableSaveButton();
+        return;
+    }
+
+    // Show clash details
+    box.classList.remove('hidden');
+    list.innerHTML = '';
+
+    clashes.forEach(c => {
+        const fmtDt = (d, t) =>
+            new Date(`${d}T${t}`).toLocaleDateString('en-GB', {
+                weekday:'short', day:'2-digit', month:'short'
+            }) + ' ' + t;
+
+        const item     = document.createElement('div');
+        item.className = 'live-conflict-item';
+        item.innerHTML = `
+            <div class="conflict-item-header">
+                <span class="conflict-item-badge
+                    ${c.type === 'Equipment'
+                        ? 'badge-equipment'
+                        : 'badge-pic'}">
+                    ${c.type === 'Equipment'
+                        ? '&#128295; Equipment'
+                        : '&#128100; PIC'}
+                </span>
+                <strong>${c.resource}</strong>
+            </div>
+            <div class="conflict-item-detail">
+                Already assigned to
+                <strong>${c.clashWith.pjm}</strong>
+                &mdash; ${c.clashWith.title}
+            </div>
+            <div class="conflict-item-detail">
+                &#9654; ${fmtDt(
+                    c.clashWith.startDate,
+                    c.clashWith.startTime
+                )}
+                &nbsp;&rarr;&nbsp;
+                &#9632; ${fmtDt(
+                    c.clashWith.endDate,
+                    c.clashWith.endTime
+                )}
+            </div>
+        `;
+        list.appendChild(item);
+
+        if (c.type === 'Equipment') {
+            document.getElementById('f-equipment')
+                .classList.add('clash-field');
+        } else {
+            document.getElementById('f-pic')
+                .classList.add('clash-field');
+        }
+    });
+
+    disableSaveButton();
+}
+
+function clearClashHighlights() {
+    ['f-equipment', 'f-pic'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('clash-field');
+    });
+}
+
+function disableSaveButton() {
+    const btn = document.getElementById('save-btn');
+    btn.classList.add('blocked');
+    btn.setAttribute('disabled', 'true');
+    btn.innerHTML = '&#128683; Clash Detected — Cannot Save';
+}
+
+function enableSaveButton() {
+    const btn = document.getElementById('save-btn');
+    btn.classList.remove('blocked');
+    btn.removeAttribute('disabled');
+    btn.innerHTML = editingId
+        ? '&#9998; Update Project'
+        : '&#128190; Save Project';
+}
+
+// =============================================
+// CLASH DETECTION
+// =============================================
+function detectClashes(equipment, pic, startDt, endDt,
+                        excludeId = null) {
+    const clashes = [];
+    projects.forEach(p => {
+        if (p.id === excludeId) return;
+        if (!(startDt < p.endDt && endDt > p.startDt)) return;
+
+        if (p.equipment === equipment) {
+            clashes.push({
+                type     : 'Equipment',
+                resource : equipment,
+                clashWith: p
+            });
+        }
+        if (p.pic === pic) {
+            clashes.push({
+                type     : 'PIC',
+                resource : pic,
+                clashWith: p
+            });
+        }
+    });
+    return clashes;
+}
+
+// =============================================
+// FORM VALIDATION
+// =============================================
+function validateForm() {
+    let valid = true;
+
+    const fields = [
+        { id:'f-pjm',        err:'err-pjm',
+          msg:'PJM Number is required' },
+        { id:'f-title',      err:'err-title',
+          msg:'Project Title is required' },
+        { id:'f-equipment',  err:'err-equipment',
+          msg:'Equipment is required' },
+        { id:'f-pic',        err:'err-pic',
+          msg:'Person in Charge is required' },
+        { id:'f-start-date', err:'err-start',
+          msg:'Start date is required' },
+        { id:'f-end-date',   err:'err-end',
+          msg:'End date is required' },
+        { id:'f-qty',        err:'err-qty',
+          msg:'Sample Quantity is required' },
+        { id:'f-lot',        err:'err-lot',
+          msg:'Sample Lot is required' },
+    ];
+
+    fields.forEach(f => {
+        const el  = document.getElementById(f.id);
+        const err = document.getElementById(f.err);
+        if (!el.value.trim()) {
+            el.classList.add('error');
+            err.textContent = f.msg;
+            err.classList.add('show');
+            valid = false;
+        } else {
+            el.classList.remove('error');
+            err.textContent = '';
+            err.classList.remove('show');
+        }
+    });
+
+    return valid;
+}
+
+// =============================================
+// SAVE PROJECT
+// =============================================
+function saveProject() {
+    enableSaveButton();
+
+    if (!validateForm()) {
+        showToast('error', 'Validation Error',
+            'Please fill all required fields');
+        return;
+    }
+
+    const data = getFormData();
+
+    if (data.startDt >= data.endDt) {
+        const el  = document.getElementById('f-end-date');
+        const err = document.getElementById('err-end');
+        el.classList.add('error');
+        err.textContent = 'End must be after start';
+        err.classList.add('show');
+        showToast('error', 'Date Error',
+            'End date/time must be after start');
+        return;
+    }
+
+    const dup = projects.find(
+        p => p.pjm === data.pjm && p.id !== editingId
+    );
+    if (dup) {
+        const el  = document.getElementById('f-pjm');
+        const err = document.getElementById('err-pjm');
+        el.classList.add('error');
+        err.textContent = `"${data.pjm}" already exists`;
+        err.classList.add('show');
+        showToast('error', 'Duplicate PJM',
+            `"${data.pjm}" is already in use`);
+        return;
+    }
+
+    const clashes = detectClashes(
+        data.equipment, data.pic,
+        data.startDt, data.endDt, editingId
+    );
+
+    if (clashes.length > 0) {
+        showClashModal(clashes, data);
+        disableSaveButton();
+        document.getElementById('live-conflict-box')
+            .classList.remove('hidden');
+        showToast('error', 'Save Blocked',
+            `${clashes.length} clash(es) detected. ` +
+            'Change Equipment, PIC, or schedule.');
+        return;
+    }
+
+    commitSave(data);
+}
+
+// =============================================
+// GET FORM DATA
+// =============================================
+function getFormData() {
+    const startDate =
+        document.getElementById('f-start-date').value;
+    const startTime =
+        document.getElementById('f-start-time').value;
+    const endDate =
+        document.getElementById('f-end-date').value;
+    const endTime =
+        document.getElementById('f-end-time').value;
+
+    return {
+        pjm       : document.getElementById('f-pjm')
+                        .value.trim(),
+        title     : document.getElementById('f-title')
+                        .value.trim(),
+        equipment : document.getElementById('f-equipment')
+                        .value.trim(),
+        pic       : document.getElementById('f-pic')
+                        .value.trim(),
+        startDate,
+        startTime,
+        endDate,
+        endTime,
+        startDt   : new Date(`${startDate}T${startTime}`),
+        endDt     : new Date(`${endDate}T${endTime}`),
+        qty       : document.getElementById('f-qty')
+                        .value.trim(),
+        lot       : document.getElementById('f-lot')
+                        .value.trim(),
+        notes     : document.getElementById('f-notes')
+                        .value.trim(),
+    };
+}
+
+// =============================================
+// COMMIT SAVE
+// =============================================
+function commitSave(data) {
+    const colorIdx = editingId
+        ? projects.findIndex(p => p.id === editingId)
+        : projects.length;
+
+    const rn = editingId
+        ? (projects.find(p => p.id === editingId)?.rowNum
+           || rowCounter++)
+        : rowCounter++;
+
+    const project = {
+        id        : editingId ||
+                    `proj_${Date.now()}_${Math.random()
+                        .toString(36).substr(2, 5)}`,
+        pjm       : data.pjm,
+        title     : data.title,
+        equipment : data.equipment,
+        pic       : data.pic,
+        startDate : data.startDate,
+        startTime : data.startTime,
+        endDate   : data.endDate,
+        endTime   : data.endTime,
+        startDt   : data.startDt,
+        endDt     : data.endDt,
+        qty       : data.qty,
+        lot       : data.lot,
+        notes     : data.notes,
+        color     : PROJECT_COLORS[colorIdx % PROJECT_COLORS.length],
+        rowNum    : rn,
+    };
+
+    if (editingId) {
+        const idx     = projects.findIndex(p => p.id === editingId);
+        projects[idx] = project;
+        editingId     = null;
+        showToast('success', 'Updated',
+            `${project.pjm} updated successfully`);
+    } else {
+        projects.push(project);
+        showToast('success', 'Saved!',
+            `${project.pjm} added successfully`);
+    }
+
+    clearForm();
+    refreshAll();
+    currentWeekStart = getWeekStart(data.startDt);
+    renderCalendar();
+    switchTab('calendar');
+}
+
+// =============================================
+// CLEAR FORM
+// =============================================
+function clearForm() {
+    document.getElementById('project-form').reset();
+    setDefaultDates();
+    document.getElementById('f-start-time').value = '08:00';
+    document.getElementById('f-end-time').value   = '17:00';
+
+    // Manually clear text inputs not reset by form.reset()
+    // (form.reset() works fine for text inputs, but
+    //  we ensure equipment & pic are blank)
+    const equipEl = document.getElementById('f-equipment');
+    if (equipEl) equipEl.value = '';
+    const picEl = document.getElementById('f-pic');
+    if (picEl) picEl.value = '';
+
+    hideEquipmentDropdown();
+    editingId = null;
+
+    const box = document.getElementById('live-conflict-box');
+    if (box) {
+        box.classList.add('hidden');
+        const list =
+            document.getElementById('live-conflict-list');
+        if (list) list.innerHTML = '';
+    }
+
+    document.querySelectorAll('.form-input, .form-select')
+        .forEach(el =>
+            el.classList.remove('error', 'clash-field')
+        );
+    document.querySelectorAll('.error-msg')
+        .forEach(el => {
+            el.textContent = '';
+            el.classList.remove('show');
+        });
+
+    enableSaveButton();
+}
+
+// =============================================
+// CLASH BLOCK MODAL
+// =============================================
+function showClashModal(clashes, newData) {
+    const container =
+        document.getElementById('clash-modal-content');
+    container.innerHTML = '';
+
+    const fmtDt = (d, t) =>
+        new Date(`${d}T${t}`).toLocaleDateString('en-GB', {
+            weekday:'short', day:'2-digit', month:'short'
+        }) + ' ' + t;
+
+    clashes.forEach(c => {
+        const card     = document.createElement('div');
+        card.className = 'clash-card';
+        card.innerHTML = `
+            <div class="clash-card-header">
+                <span class="clash-type-badge
+                    ${c.type === 'Equipment'
+                        ? 'type-equipment'
+                        : 'type-pic'}">
+                    ${c.type === 'Equipment'
+                        ? '&#128295; Equipment Clash'
+                        : '&#128100; PIC Clash'}
+                </span>
+                <span class="clash-resource">
+                    ${c.resource}
+                </span>
+            </div>
+            <div class="clash-projects">
+                <div class="clash-proj"
+                    style="background:#eef4fb;
+                           border:1px solid #bfcfdf">
+                    <div class="clash-proj-pjm"
+                        style="color:#1e3a5f">
+                        ${newData.pjm}
+                        <span class="new-project-badge">NEW</span>
+                    </div>
+                    <div class="clash-proj-title">
+                        ${newData.title}
+                    </div>
+                    <div class="clash-proj-time">
+                        &#9654; ${fmtDt(
+                            newData.startDate, newData.startTime
+                        )}
+                    </div>
+                    <div class="clash-proj-time">
+                        &#9632; ${fmtDt(
+                            newData.endDate, newData.endTime
+                        )}
+                    </div>
+                </div>
+                <div class="clash-vs">&#9889;<br>CLASH</div>
+                <div class="clash-proj"
+                    style="background:${c.clashWith.color}18;
+                           border:1px solid ${c.clashWith.color}55">
+                    <div class="clash-proj-pjm"
+                        style="color:${c.clashWith.color}">
+                        ${c.clashWith.pjm}
+                    </div>
+                    <div class="clash-proj-title">
+                        ${c.clashWith.title}
+                    </div>
+                    <div class="clash-proj-time">
+                        &#9654; ${fmtDt(
+                            c.clashWith.startDate,
+                            c.clashWith.startTime
+                        )}
+                    </div>
+                    <div class="clash-proj-time">
+                        &#9632; ${fmtDt(
+                            c.clashWith.endDate,
+                            c.clashWith.endTime
+                        )}
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+
+    document.getElementById('clash-modal').classList.add('show');
+}
+
+// =============================================
+// CALENDAR
+// =============================================
+function getWeekStart(date) {
+    const d   = new Date(date);
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function prevWeek() {
+    currentWeekStart =
+        new Date(currentWeekStart.getTime() - 7 * 86400000);
+    renderCalendar();
+}
+
+function nextWeek() {
+    currentWeekStart =
+        new Date(currentWeekStart.getTime() + 7 * 86400000);
+    renderCalendar();
+}
+
+function goToToday() {
+    currentWeekStart = getWeekStart(new Date());
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = '';
+
+    const days = [
+        'Monday','Tuesday','Wednesday',
+        'Thursday','Friday','Saturday','Sunday'
+    ];
+
+    const hours = [];
+    for (let h = CAL_START; h <= CAL_END; h++) hours.push(h);
+
+    const weekEnd =
+        new Date(currentWeekStart.getTime() + 6 * 86400000);
+    const fmt = d =>
+        d.toLocaleDateString('en-GB',
+            { day:'2-digit', month:'short' });
+
+    document.getElementById('week-label').textContent =
+        `${fmt(currentWeekStart)} - ` +
+        `${fmt(weekEnd)} ${weekEnd.getFullYear()}`;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Corner
+    const corner     = document.createElement('div');
+    corner.className = 'cal-header-cell time-header';
+    grid.appendChild(corner);
+
+    // Day headers
+    const dayDates = [];
+    days.forEach((day, i) => {
+        const dayDate =
+            new Date(currentWeekStart.getTime() + i * 86400000);
+        dayDates.push(dayDate);
+        const isToday = dayDate.getTime() === today.getTime();
+
+        const cell     = document.createElement('div');
+        cell.className =
+            'cal-header-cell' +
+            (isToday ? ' today-header' : '');
+        cell.innerHTML = `
+            <div class="cal-day-name">
+                ${day.substring(0, 3)}
+            </div>
+            <div class="cal-day-date
+                ${isToday ? ' today-date' : ''}">
+                ${dayDate.toLocaleDateString('en-GB',
+                    { day:'2-digit', month:'short' })}
+            </div>
+            ${isToday
+                ? '<span class="today-badge">TODAY</span>'
+                : ''}
+        `;
+        grid.appendChild(cell);
+    });
+
+    // Hour rows
+    hours.forEach(hour => {
+        const isMidnight = (hour === 0);
+
+        const tc     = document.createElement('div');
+        tc.className =
+            'cal-time-cell' +
+            (isMidnight ? ' midnight' : '');
+        tc.innerHTML = `
+            <span class="cal-time-label">
+                ${String(hour).padStart(2,'0')}:00
+            </span>
+        `;
+        grid.appendChild(tc);
+
+        days.forEach((_, i) => {
+            const isToday =
+                dayDates[i].getTime() === today.getTime();
+            const isAlt = hour % 2 === 1;
+
+            const cell     = document.createElement('div');
+            cell.className = [
+                'cal-day-cell',
+                isToday    ? 'today-col' : '',
+                isAlt      ? 'alt-row'   : '',
+                isMidnight ? 'midnight'  : '',
+            ].filter(Boolean).join(' ');
+
+            cell.style.height = SLOT_H + 'px';
+            cell.dataset.day  = i;
+            cell.dataset.hour = hour;
+            grid.appendChild(cell);
+        });
+    });
+
+    placeProjectBlocks(dayDates, hours);
+    updateCurrentTimeLine();
+    renderCalendarLegend();
+}
+
+// =============================================
+// PLACE PROJECT BLOCKS
+// =============================================
+function placeProjectBlocks(dayDates, hours) {
+    const startHour = hours[0];
+    const endHour   = hours[hours.length - 1] + 1;
+
+    dayDates.forEach((dayDate, dayIdx) => {
+        const dayStart = new Date(dayDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart.getTime() + 86400000);
+
+        const dayProjects = projects.filter(
+            p => p.startDt < dayEnd && p.endDt > dayStart
+        );
+        if (!dayProjects.length) return;
+
+        const columns = assignColumns(dayProjects);
+
+        dayProjects.forEach(project => {
+            const segStart = project.startDt < dayStart
+                ? dayStart : project.startDt;
+            const segEnd   = project.endDt > dayEnd
+                ? dayEnd   : project.endDt;
+
+            const startH =
+                segStart.getHours() + segStart.getMinutes() / 60;
+            const endH   =
+                segEnd.getHours()   + segEnd.getMinutes()   / 60;
+
+            const visStart = Math.max(startH, startHour);
+            const visEnd   = Math.min(endH,   endHour);
+            if (visStart >= visEnd) return;
+
+            const heightPx =
+                Math.max((visEnd - visStart) * SLOT_H - 2, 16);
+            const { col, totalCols } = columns[project.id];
+            const widthPct  = 100 / totalCols;
+            const leftPct   = col * widthPct;
+            const durationH =
+                Math.round(
+                    (segEnd - segStart) / 3600000 * 10
+                ) / 10;
+
+            const block       = document.createElement('div');
+            block.className   = 'project-block';
+            block.style.cssText = `
+                height     : ${heightPx}px;
+                left       : calc(${leftPct}% + 2px);
+                width      : calc(${widthPct}% - 4px);
+                background : linear-gradient(
+                    160deg,
+                    ${project.color}ee,
+                    ${darkenColor(project.color)}cc
+                );
+            `;
+            block.innerHTML = `
+                <div class="project-block-header"
+                    style="background:
+                        ${darkenColor(project.color)}">
+                    ${project.pjm}
+                </div>
+                <div class="project-block-body">
+                    ${heightPx > 36
+                        ? `<div class="project-block-title">
+                               ${truncate(project.title, 18)}
+                           </div>` : ''}
+                    ${heightPx > 56
+                        ? `<div class="project-block-detail">
+                               ${truncate(
+                                   project.equipment
+                                       .split(' - ')[0], 15
+                               )}
+                           </div>` : ''}
+                    ${heightPx > 76
+                        ? `<div class="project-block-detail">
+                               ${project.pic.split(' ')[0]}
+                           </div>` : ''}
+                    ${heightPx > 96
+                        ? `<div class="project-block-detail">
+                               ${durationH}h
+                           </div>` : ''}
+                </div>
+            `;
+
+            block.addEventListener('click',
+                () => showProjectDetail(project.id));
+
+            const targetHour = Math.floor(visStart);
+            const hostCell   = document
+                .getElementById('calendar-grid')
+                .querySelector(
+                    `.cal-day-cell[data-day="${dayIdx}"]` +
+                    `[data-hour="${targetHour}"]`
+                );
+            if (!hostCell) return;
+
+            block.style.top         =
+                (visStart - targetHour) * SLOT_H + 'px';
+            hostCell.style.overflow = 'visible';
+            hostCell.appendChild(block);
+        });
+    });
+}
+
+// =============================================
+// COLUMN ASSIGNMENT
+// =============================================
+function assignColumns(dayProjects) {
+    const columns = {};
+    const sorted  =
+        [...dayProjects].sort((a, b) => a.startDt - b.startDt);
+
+    sorted.forEach(project => {
+        const usedCols = sorted
+            .filter(o =>
+                o.id !== project.id &&
+                project.startDt < o.endDt &&
+                project.endDt   > o.startDt &&
+                columns[o.id]   !== undefined
+            )
+            .map(o => columns[o.id].col);
+
+        let col = 0;
+        while (usedCols.includes(col)) col++;
+        columns[project.id] = { col, totalCols: 1 };
+    });
+
+    sorted.forEach(project => {
+        const overlapping = sorted.filter(o =>
+            project.startDt < o.endDt &&
+            project.endDt   > o.startDt
+        );
+        const maxCol = Math.max(
+            ...overlapping.map(o => columns[o.id]?.col ?? 0)
+        );
+        overlapping.forEach(o => {
+            if (columns[o.id])
+                columns[o.id].totalCols = maxCol + 1;
+        });
+    });
+
+    return columns;
+}
+
+// =============================================
+// CURRENT TIME LINE
+// =============================================
+function updateCurrentTimeLine() {
+    document.querySelectorAll('.current-time-line')
+        .forEach(el => el.remove());
+
+    const now     = new Date();
+    const weekEnd =
+        new Date(currentWeekStart.getTime() + 7 * 86400000);
+    if (now < currentWeekStart || now >= weekEnd) return;
+
+    const dayIdx =
+        now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const currentHour =
+        now.getHours() + now.getMinutes() / 60;
+
+    const targetHour = Math.floor(currentHour);
+    const posInHour  = (currentHour % 1) * SLOT_H;
+
+    const cell = document
+        .getElementById('calendar-grid')
+        .querySelector(
+            `.cal-day-cell[data-day="${dayIdx}"]` +
+            `[data-hour="${targetHour}"]`
+        );
+    if (!cell) return;
+
+    const line     = document.createElement('div');
+    line.className = 'current-time-line';
+    line.style.top = posInHour + 'px';
+    line.innerHTML = '<div class="current-time-dot"></div>';
+    cell.appendChild(line);
+}
+
+// =============================================
+// CALENDAR LEGEND
+// =============================================
+function renderCalendarLegend() {
+    const legend = document.getElementById('calendar-legend');
+    legend.innerHTML = '';
+
+    projects.slice(0, 5).forEach(p => {
+        const item     = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+            <div class="legend-dot"
+                style="background:${p.color}"></div>
+            <span>${p.pjm}</span>
+        `;
+        legend.appendChild(item);
+    });
+
+    if (projects.length > 5) {
+        const more     = document.createElement('div');
+        more.className = 'legend-item';
+        more.innerHTML = `
+            <span style="color:var(--text-dim)">
+                +${projects.length - 5} more
+            </span>
+        `;
+        legend.appendChild(more);
+    }
+}
+
+// =============================================
+// TABLE
+// =============================================
+function renderTable(data = null) {
+    const tbody = document.getElementById('project-tbody');
+    const empty = document.getElementById('empty-state');
+    const list  = data ?? projects;
+
+    tbody.innerHTML = '';
+
+    if (!list.length) {
+        empty.style.display = 'block';
+        updateFilters();
+        return;
+    }
+    empty.style.display = 'none';
+
+    const sorted = [...list].sort((a, b) => {
+        let va = a[sortConfig.col] ?? '';
+        let vb = b[sortConfig.col] ?? '';
+        if (sortConfig.col === 'start') {
+            va = a.startDt; vb = b.startDt;
+        }
+        if (sortConfig.col === 'end') {
+            va = a.endDt; vb = b.endDt;
+        }
+        if (va < vb) return sortConfig.dir === 'asc' ? -1 :  1;
+        if (va > vb) return sortConfig.dir === 'asc' ?  1 : -1;
+        return 0;
+    });
+
+    const fmtDt = (d, t) =>
+        new Date(`${d}T${t}`).toLocaleDateString('en-GB', {
+            day:'2-digit', month:'short', year:'2-digit'
+        }) + ' ' + t;
+
+    sorted.forEach(project => {
+        const tr      = document.createElement('tr');
+        tr.dataset.id = project.id;
+
+        tr.innerHTML = `
+            <td class="checkbox-cell">
+                <input type="checkbox"
+                    data-id="${project.id}"
+                    class="row-check">
+            </td>
+            <td style="color:var(--text-dim);font-size:11px">
+                ${project.rowNum}
+            </td>
+            <td>
+                <div style="display:flex;
+                            align-items:center;gap:6px">
+                    <div class="color-dot"
+                        style="background:${project.color}">
+                    </div>
+                    <strong>${project.pjm}</strong>
+                </div>
+            </td>
+            <td>${project.title}</td>
+            <td style="font-size:12px">${project.equipment}</td>
+            <td>${project.pic}</td>
+            <td style="font-size:12px;white-space:nowrap">
+                ${fmtDt(project.startDate, project.startTime)}
+            </td>
+            <td style="font-size:12px;white-space:nowrap">
+                ${fmtDt(project.endDate, project.endTime)}
+            </td>
+            <td style="text-align:center">${project.qty}</td>
+            <td style="font-size:12px">${project.lot}</td>
+            <td>
+                <button class="action-btn"
+                    data-action="view"
+                    data-tooltip="View">
+                    &#128065;
+                </button>
+                <button class="action-btn"
+                    data-action="edit"
+                    data-tooltip="Edit">
+                    &#9998;
+                </button>
+                <button class="action-btn del"
+                    data-action="delete"
+                    data-tooltip="Delete">
+                    &#128465;
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    updateFilters();
+}
+
+// =============================================
+// SORT
+// =============================================
+function sortTable(col) {
+    sortConfig.dir =
+        sortConfig.col === col && sortConfig.dir === 'asc'
+        ? 'desc' : 'asc';
+    sortConfig.col = col;
+
+    document.querySelectorAll('.data-table th')
+        .forEach(th =>
+            th.classList.remove('sort-asc', 'sort-desc')
+        );
+
+    const th = document.querySelector(
+        `.data-table th[data-col="${col}"]`
+    );
+    if (th) {
+        th.classList.add(
+            sortConfig.dir === 'asc' ? 'sort-asc' : 'sort-desc'
+        );
+    }
+    renderTable();
+}
+
+// =============================================
+// FILTER
+// =============================================
+function filterProjects() {
+    const query =
+        document.getElementById('search-input')
+                .value.toLowerCase();
+    const equip =
+        document.getElementById('filter-equipment').value;
+    const pic   =
+        document.getElementById('filter-pic').value;
+
+    const filtered = projects.filter(p => {
+        const str =
+            `${p.pjm} ${p.title} ${p.equipment} ` +
+            `${p.pic} ${p.lot}`.toLowerCase();
+        return (
+            (!query || str.includes(query)) &&
+            (!equip || p.equipment === equip) &&
+            (!pic   || p.pic       === pic)
+        );
+    });
+
+    renderTable(filtered);
+}
+
+function updateFilters() {
+    const equipSel = document.getElementById('filter-equipment');
+    const picSel   = document.getElementById('filter-pic');
+    const curEquip = equipSel.value;
+    const curPic   = picSel.value;
+
+    equipSel.innerHTML =
+        '<option value="">All Equipment</option>' +
+        [...new Set(projects.map(p => p.equipment))].sort()
+            .map(e =>
+                `<option${e === curEquip
+                    ? ' selected' : ''}>${e}</option>`
+            ).join('');
+
+    picSel.innerHTML =
+        '<option value="">All PIC</option>' +
+        [...new Set(projects.map(p => p.pic))].sort()
+            .map(p =>
+                `<option${p === curPic
+                    ? ' selected' : ''}>${p}</option>`
+            ).join('');
+}
+
+// =============================================
+// SELECT ALL / BULK DELETE
+// =============================================
+function toggleSelectAll() {
+    const checked =
+        document.getElementById('select-all').checked;
+    document.querySelectorAll('#project-tbody .row-check')
+        .forEach(cb => { cb.checked = checked; });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const n = document.querySelectorAll(
+        '#project-tbody .row-check:checked'
+    ).length;
+    document.getElementById('selected-count').textContent =
+        n > 0 ? `${n} selected` : '';
+}
+
+document.addEventListener('change', e => {
+    if (e.target.classList.contains('row-check')) {
+        updateSelectedCount();
+    }
+});
+
+function deleteSelected() {
+    const selected = [
+        ...document.querySelectorAll(
+            '#project-tbody .row-check:checked'
+        )
+    ];
+    if (!selected.length) {
+        showToast('warning', 'No Selection',
+            'Please select at least one project');
+        return;
+    }
+    if (!confirm(
+        `Delete ${selected.length} selected project(s)?`
+    )) return;
+
+    const ids = selected.map(cb => cb.dataset.id);
+    projects  = projects.filter(p => !ids.includes(p.id));
+    refreshAll();
+    showToast('success', 'Deleted',
+        `${ids.length} project(s) removed`);
+}
+
+// =============================================
+// DELETE SINGLE
+// =============================================
+function deleteProject(id) {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+    if (!confirm(
+        `Delete "${project.pjm} — ${project.title}"?`
+    )) return;
+
+    projects = projects.filter(p => p.id !== id);
+    refreshAll();
+    closeModal('detail-modal');
+    showToast('success', 'Deleted',
+        `${project.pjm} has been removed`);
+}
+
+// =============================================
+// EDIT PROJECT
+// =============================================
+function editProject(id) {
+    const p = projects.find(proj => proj.id === id);
+    if (!p) {
+        showToast('error', 'Error', 'Project not found');
+        return;
+    }
+
+    editingId = id;
+
+    const set = (elId, val) => {
+        const el = document.getElementById(elId);
+        if (el) el.value = val ?? '';
+    };
+
+    set('f-pjm',        p.pjm);
+    set('f-title',      p.title);
+    set('f-equipment',  p.equipment);
+    set('f-pic',        p.pic);
+    set('f-start-date', p.startDate);
+    set('f-start-time', p.startTime);
+    set('f-end-date',   p.endDate);
+    set('f-end-time',   p.endTime);
+    set('f-qty',        p.qty);
+    set('f-lot',        p.lot);
+    set('f-notes',      p.notes || '');
+
+    // Clear errors
+    document.querySelectorAll('.form-input, .form-select')
+        .forEach(el =>
+            el.classList.remove('error', 'clash-field')
+        );
+    document.querySelectorAll('.error-msg')
+        .forEach(el => {
+            el.textContent = '';
+            el.classList.remove('show');
+        });
+
+    // Hide clash box
+    const box = document.getElementById('live-conflict-box');
+    if (box) {
+        box.classList.add('hidden');
+        const list =
+            document.getElementById('live-conflict-list');
+        if (list) list.innerHTML = '';
+    }
+
+    hideEquipmentDropdown();
+    enableSaveButton();
+    liveConflictCheck();
+
+    closeModal('detail-modal');
+    closeModal('clash-modal');
+
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) sidebar.scrollTop = 0;
+
+    showToast('info', 'Edit Mode',
+        `Now editing: ${p.pjm} — ${p.title}`);
+}
+
+// =============================================
+// EXPORT CSV
+// =============================================
+function exportCSV() {
+    if (!projects.length) {
+        showToast('warning', 'No Data', 'No projects to export');
+        return;
+    }
+
+    const headers = [
+        'No', 'PJM Number', 'Project Title',
+        'Equipment', 'PIC',
+        'Start Date', 'Start Time',
+        'End Date',   'End Time',
+        'Sample Qty', 'Sample Lot', 'Notes'
+    ];
+
+    const rows = projects.map(p => [
+        p.rowNum, p.pjm, p.title,
+        p.equipment, p.pic,
+        p.startDate, p.startTime,
+        p.endDate,   p.endTime,
+        p.qty, p.lot, p.notes || ''
+    ]);
+
+    const csv = [headers, ...rows]
+        .map(row =>
+            row.map(v =>
+                `"${String(v).replace(/"/g, '""')}"`
+            ).join(',')
+        ).join('\n');
+
+    const blob   = new Blob([csv],
+        { type: 'text/csv;charset=utf-8;' });
+    const url    = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href     = url;
+    anchor.download =
+        `PJM_BuildPlan_` +
+        `${new Date().toISOString().split('T')[0]}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showToast('success', 'Exported', 'CSV downloaded');
+}
+
+// =============================================
+// DETAIL MODAL
+// =============================================
+function showProjectDetail(id) {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+
+    const duration =
+        Math.round(
+            (project.endDt - project.startDt) / 3600000 * 10
+        ) / 10;
+
+    const fmtDt = (d, t) =>
+        new Date(`${d}T${t}`).toLocaleDateString('en-GB', {
+            weekday : 'short',
+            day     : '2-digit',
+            month   : 'short',
+            year    : 'numeric'
+        }) + ' — ' + t;
+
+    const header = document.getElementById('modal-header');
+    header.style.background =
+        `linear-gradient(135deg, ${project.color}, ` +
+        `${darkenColor(project.color)})`;
+
+    document.getElementById('modal-title').textContent =
+        project.pjm;
+    document.getElementById('modal-subtitle').textContent =
+        project.title;
+
+    document.getElementById('modal-body').innerHTML = `
+        <div class="detail-grid">
+            ${[
+                ['Equipment',        project.equipment],
+                ['Person in Charge', project.pic],
+                ['Start',
+                 fmtDt(project.startDate, project.startTime)],
+                ['End',
+                 fmtDt(project.endDate,   project.endTime)],
+                ['Duration',         `${duration} hours`],
+                ['Sample Qty',       project.qty],
+                ['Sample Lot',       project.lot],
+                ['Notes',            project.notes || '&mdash;'],
+            ].map(([label, value]) => `
+                <div class="detail-row">
+                    <span class="detail-label">${label}</span>
+                    <span class="detail-value">${value}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    document.getElementById('modal-footer').innerHTML = `
+        <button class="btn btn-ghost"
+            data-action="close-detail">
+            Close
+        </button>
+        <button class="btn btn-ghost"
+            data-action="edit-from-modal"
+            data-id="${project.id}"
+            style="color:#1e3a5f;border-color:#1e3a5f">
+            &#9998; Edit
+        </button>
+        <button class="btn btn-danger"
+            data-action="delete-from-modal"
+            data-id="${project.id}">
+            &#128465; Delete
+        </button>
+    `;
+
+    document.getElementById('detail-modal')
+        .classList.add('show');
+}
+
+// =============================================
+// MODAL FOOTER DELEGATION
+// =============================================
+document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const id     = btn.dataset.id;
+
+    if (action === 'close-detail') {
+        closeModal('detail-modal');
+    }
+    if (action === 'edit-from-modal' && id) {
+        editProject(id);
+    }
+    if (action === 'delete-from-modal' && id) {
+        deleteProject(id);
+    }
+});
+
+// =============================================
+// MODAL HELPERS
+// =============================================
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) closeModal(overlay.id);
+    });
+});
+
+// =============================================
+// TABS
+// =============================================
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn')
+        .forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content')
+        .forEach(c => c.classList.remove('active'));
+
+    document.getElementById(`tab-${name}`)
+        .classList.add('active');
+    document.getElementById(`tab-content-${name}`)
+        .classList.add('active');
+
+    if (name === 'calendar') renderCalendar();
+    if (name === 'list')     renderTable();
+}
+
+// =============================================
+// STATS
+// =============================================
+function updateStats() {
+    const now    = new Date();
+    const wStart = getWeekStart(now);
+    const wEnd   = new Date(wStart.getTime() + 7 * 86400000);
+
+    document.getElementById('stat-total').textContent =
+        projects.length;
+    document.getElementById('stat-week').textContent  =
+        projects.filter(
+            p => p.startDt < wEnd && p.endDt > wStart
+        ).length;
+    document.getElementById('stat-equipment').textContent =
+        new Set(projects.map(p => p.equipment)).size;
+}
+
+function updateCurrentDate() {
+    document.getElementById('current-date').textContent =
+        new Date().toLocaleDateString('en-GB', {
+            weekday : 'long',
+            day     : '2-digit',
+            month   : 'long',
+            year    : 'numeric'
+        });
+}
+
+function refreshAll() {
+    renderCalendar();
+    renderTable();
+    updateStats();
+}
+
+// =============================================
+// TOAST
+// =============================================
+function showToast(type, title, message) {
+    const icons = {
+        success : '&#9989;',
+        error   : '&#10060;',
+        warning : '&#9888;',
+        info    : '&#8505;'
+    };
+
+    const toast     = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type]}</span>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <div class="toast-msg">${message}</div>
+        </div>
+    `;
+
+    document.getElementById('toast-container')
+        .appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 300);
+    }, 4000);
+}
+
+// =============================================
+// UTILITIES
+// =============================================
+function darkenColor(hex) {
+    hex     = hex.replace('#', '');
+    const r = Math.floor(parseInt(hex.substr(0,2), 16) * 0.65);
+    const g = Math.floor(parseInt(hex.substr(2,2), 16) * 0.65);
+    const b = Math.floor(parseInt(hex.substr(4,2), 16) * 0.65);
+    return '#' +
+        r.toString(16).padStart(2,'0') +
+        g.toString(16).padStart(2,'0') +
+        b.toString(16).padStart(2,'0');
+}
+
+function truncate(str, max) {
+    return str.length > max
+        ? str.substring(0, max) + '\u2026'
+        : str;
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.show')
+            .forEach(m => m.classList.remove('show'));
+        hideEquipmentDropdown();
+    }
+});

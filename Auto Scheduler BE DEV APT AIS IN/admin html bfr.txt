@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Build Plan Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ===== ADMIN DASHBOARD STYLES ===== */
+        .admin-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(245,158,11,0.3);
+        }
+        .admin-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+        }
+
+        /* Admin Login Modal */
+        .admin-login-modal {
+            max-width: 420px;
+            width: 95%;
+        }
+        .admin-login-header {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            color: white;
+            padding: 24px;
+            border-radius: 16px 16px 0 0;
+            text-align: center;
+        }
+        .admin-login-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .admin-login-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .admin-login-sub {
+            font-size: 13px;
+            opacity: 0.7;
+        }
+        .admin-login-body {
+            padding: 28px;
+            background: #fff;
+        }
+        .admin-login-field {
+            margin-bottom: 18px;
+        }
+        .admin-login-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+        .admin-login-input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border 0.2s;
+            box-sizing: border-box;
+            outline: none;
+        }
+        .admin-login-input:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+        }
+        .admin-login-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        .admin-login-footer {
+            padding: 16px 28px 24px;
+            background: #fff;
+            border-radius: 0 0 16px 16px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn-admin-login {
+            flex: 1;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-admin-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+        }
+        .btn-admin-cancel {
+            flex: 1;
+            background: #f1f5f9;
+            color: #64748b;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-admin-cancel:hover {
+            background: #e2e8f0;
+        }
+
+        /* Admin Dashboard Modal */
+        .admin-dashboard-modal {
+            max-width: 780px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .admin-dash-header {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            color: white;
+            padding: 20px 24px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .admin-dash-header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .admin-dash-icon {
+            width: 46px;
+            height: 46px;
+            background: rgba(245,158,11,0.25);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+        .admin-dash-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .admin-dash-sub {
+            font-size: 12px;
+            opacity: 0.65;
+            margin-top: 2px;
+        }
+        .admin-badge {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Dashboard body */
+        .admin-dash-body {
+            padding: 24px;
+            background: #f8fafc;
+        }
+
+        /* Section cards */
+        .admin-section-card {
+            background: white;
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            overflow: hidden;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+        .admin-section-title {
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .admin-section-title .title-icon {
+            font-size: 18px;
+        }
+        .admin-section-body {
+            padding: 20px;
+        }
+
+        /* Limit controls */
+        .limit-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .limit-control-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 18px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .limit-control-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+        .limit-control-card:focus-within {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+        }
+        .limit-control-card:focus-within::before {
+            transform: scaleX(1);
+        }
+        .limit-control-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .limit-control-icon {
+            font-size: 16px;
+        }
+        .limit-value-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .limit-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            background: white;
+            outline: none;
+            transition: border 0.2s;
+            box-sizing: border-box;
+        }
+        .limit-input:focus {
+            border-color: #f59e0b;
+        }
+        .limit-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 42px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: #f59e0b;
+        }
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(18px);
+        }
+        .toggle-label {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .toggle-label.enabled {
+            color: #f59e0b;
+            font-weight: 700;
+        }
+
+        /* Current usage stats */
+        .usage-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+        }
+        .usage-stat-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+        .usage-stat-card.over-limit {
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+        .usage-stat-card.near-limit {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+        .usage-stat-card.ok-limit {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+        .usage-stat-icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+        .usage-stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: #1e293b;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .usage-stat-label {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .usage-stat-limit {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .usage-stat-limit.over {
+            color: #ef4444;
+            font-weight: 700;
+        }
+        .usage-stat-limit.near {
+            color: #f59e0b;
+            font-weight: 700;
+        }
+        .usage-stat-limit.ok {
+            color: #22c55e;
+            font-weight: 700;
+        }
+
+        /* Progress bar */
+        .usage-progress {
+            margin-top: 8px;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .usage-progress-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .usage-progress-bar.ok {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+        }
+        .usage-progress-bar.near {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+        .usage-progress-bar.over {
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+        }
+
+        /* Admin action log */
+        .admin-log-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .admin-log-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+        .admin-log-item:last-child {
+            border-bottom: none;
+        }
+        .admin-log-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f59e0b;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        .admin-log-msg {
+            flex: 1;
+            color: #374151;
+        }
+        .admin-log-time {
+            font-size: 11px;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .admin-log-empty {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            padding: 20px;
+        }
+
+        /* Footer buttons */
+        .admin-dash-footer {
+            padding: 16px 24px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            border-radius: 0 0 16px 16px;
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+        }
+        .btn-save-limits {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            border: none;
+            padding: 11px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.2s;
+        }
+        .btn-save-limits:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(34,197,94,0.35);
+        }
+        .btn-reset-limits {
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+            padding: 11px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reset-limits:hover {
+            background: #e2e8f0;
+        }
+        .btn-admin-logout {
+            background: #fef2f2;
+            color: #ef4444;
+            border: 1px solid #fecaca;
+            padding: 11px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-right: auto;
+        }
+        .btn-admin-logout:hover {
+            background: #fee2e2;
+        }
+
+        /* Warning banner in form */
+        .limit-warning-banner {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 1px solid #fbbf24;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .limit-warning-banner.visible {
+            display: flex;
+        }
+        .limit-warning-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .limit-warning-text {
+            font-size: 12px;
+            color: #92400e;
+            font-weight: 500;
+            line-height: 1.5;
+        }
+        .limit-warning-text strong {
+            font-weight: 700;
+            color: #78350f;
+        }
+
+        /* Limit exceeded modal */
+        .limit-exceeded-header {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 20px 24px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .limit-exceeded-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .limit-exceeded-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0;
+            border-bottom: 1px solid #fee2e2;
+            font-size: 14px;
+            color: #374151;
+        }
+        .limit-exceeded-item:last-child {
+            border-bottom: none;
+        }
+        .limit-exceeded-icon {
+            font-size: 20px;
+        }
+
+        /* Credentials hint */
+        .credentials-hint {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            color: #0369a1;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        /* Admin indicator in user bar */
+        .admin-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            border: 1px solid #fbbf24;
+        }
+
+        /* Week selector */
+        .week-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .week-selector label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            white-space: nowrap;
+        }
+        .week-selector input[type="week"] {
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+            transition: border 0.2s;
+        }
+        .week-selector input[type="week"]:focus {
+            border-color: #f59e0b;
+        }
+        .week-selector-note {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* Scrollbar */
+        .admin-dashboard-modal::-webkit-scrollbar,
+        .admin-log-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .admin-dashboard-modal::-webkit-scrollbar-track,
+        .admin-log-list::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .admin-dashboard-modal::-webkit-scrollbar-thumb,
+        .admin-log-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        /* Inline save feedback */
+        .save-feedback {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #22c55e;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .save-feedback.visible {
+            opacity: 1;
+        }
+
+        /* Override limit blocked style */
+        .limit-block-details {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+        }
+        .limit-block-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 13px;
+            color: #374151;
+            border-bottom: 1px solid #fee2e2;
+        }
+        .limit-block-row:last-child {
+            border-bottom: none;
+        }
+        .limit-block-stat {
+            font-weight: 700;
+            color: #dc2626;
+        }
+        .limit-block-name {
+            flex: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .limit-controls-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .usage-stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== USER BAR ===== -->
+    <div class="user-bar" id="user-bar">
+        <div class="user-bar-left">
+            <div class="user-avatar" id="user-avatar">?</div>
+            <div class="user-info">
+                <div class="user-name" id="user-name">Loading...</div>
+                <div class="user-role" id="user-role"></div>
+            </div>
+        </div>
+        <div class="user-bar-right" style="display:flex;align-items:center;gap:10px;">
+            <!-- Admin Dashboard Button (only visible to admin) -->
+            <button class="admin-btn" id="admin-dash-btn"
+                onclick="openAdminLogin()"
+                style="display:none;"
+                title="Admin Dashboard">
+                ⚙️ Admin Dashboard
+            </button>
+            <button class="logout-btn" onclick="logout()">🔓 Logout</button>
+        </div>
+    </div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <div class="logo-icon">&#9881;</div>
+                <div>
+                    <div class="header-title">PJM Build Plan</div>
+                    <div class="header-subtitle">Project Management System</div>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="header-stats">
+                <div class="stat-badge">
+                    <span>Total Projects:</span>
+                    <span class="stat-num" id="stat-total">0</span>
+                </div>
+                <div class="stat-badge">
+                    <span>This Week:</span>
+                    <span class="stat-num" id="stat-week">0</span>
+                </div>
+                <div class="stat-badge">
+                    <span>Equipment In Use:</span>
+                    <span class="stat-num" id="stat-equipment">0</span>
+                </div>
+            </div>
+            <div class="current-date" id="current-date"></div>
+        </div>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <div class="main-container">
+        <!-- ===== SIDEBAR FORM ===== -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-icon">&#10010;</span>
+                <h2>Add New Build Plan</h2>
+            </div>
+            <div class="form-scroll">
+                <!-- Weekly Limit Warning Banner -->
+                <div class="limit-warning-banner" id="limit-warning-banner">
+                    <div class="limit-warning-icon">⚠️</div>
+                    <div class="limit-warning-text" id="limit-warning-text"></div>
+                </div>
+
+                <form id="project-form" novalidate>
+                    <!-- Project Info -->
+                    <div class="section-divider">
+                        <span class="section-label">Project Info</span>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">
+                            PJM Name <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-pjm"
+                            placeholder="e.g., PJM-2024-001">
+                        <div class="error-msg" id="err-pjm"></div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">
+                            Project Title <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-title"
+                            placeholder="Enter project title">
+                        <div class="error-msg" id="err-title"></div>
+                    </div>
+
+                    <!-- Equipment Combobox -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Equipment <span class="field-required">*</span>
+                        </label>
+                        <div class="equipment-mode-bar">
+                            <span class="equipment-mode-label" id="equipment-mode-label">
+                                &#128269; Choose from list
+                            </span>
+                        </div>
+                        <div class="combo-wrapper" id="equipment-combo-wrapper">
+                            <input type="text"
+                                class="form-input"
+                                id="f-equipment"
+                                placeholder="Select or search equipment…"
+                                autocomplete="off">
+                            <div class="combo-dropdown hidden" id="equipment-dropdown">
+                                <div class="combo-option" data-value="Equipment A - Machine 01">Equipment A - Machine 01</div>
+                                <div class="combo-option" data-value="Equipment B - Machine 02">Equipment B - Machine 02</div>
+                                <div class="combo-option" data-value="Equipment C - Machine 03">Equipment C - Machine 03</div>
+                                <div class="combo-option" data-value="Equipment D - Analyzer 01">Equipment D - Analyzer 01</div>
+                                <div class="combo-option" data-value="Equipment E - Analyzer 02">Equipment E - Analyzer 02</div>
+                                <div class="combo-option" data-value="Equipment F - Tester 01">Equipment F - Tester 01</div>
+                                <div class="combo-option" data-value="Equipment G - Tester 02">Equipment G - Tester 02</div>
+                                <div class="combo-option" data-value="Equipment H - Scanner 01">Equipment H - Scanner 01</div>
+                            </div>
+                        </div>
+                        <div class="error-msg" id="err-equipment"></div>
+                    </div>
+
+                    <!-- PIC -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Unit Process Development (UPD)
+                            <span class="field-required">*</span>
+                        </label>
+                        <input type="text"
+                            class="form-input"
+                            id="f-pic"
+                            placeholder="Enter full name of person in charge…"
+                            autocomplete="off"
+                            oninput="liveConflictCheck()">
+                        <div class="error-msg" id="err-pic"></div>
+                    </div>
+
+                    <!-- Schedule -->
+                    <div class="section-divider">
+                        <span class="section-label">Schedule</span>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">
+                            Start Date &amp; Time <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-start-date"
+                                onchange="liveConflictCheck(); checkWeekLimitLive()">
+                            <select class="form-select time-select"
+                                id="f-start-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-start"></div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">
+                            End Date &amp; Time <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-end-date"
+                                onchange="liveConflictCheck(); checkWeekLimitLive()">
+                            <select class="form-select time-select"
+                                id="f-end-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-end"></div>
+                    </div>
+
+                    <!-- Live Clash Alert -->
+                    <div id="live-conflict-box" class="live-conflict-box hidden">
+                        <div class="live-conflict-title">⚠️ Scheduling Clash Detected</div>
+                        <div id="live-conflict-list"></div>
+                    </div>
+
+                    <!-- Sample Info -->
+                    <div class="section-divider">
+                        <span class="section-label">Sample Information</span>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">
+                            Quantity <span class="field-required">*</span>
+                        </label>
+                        <input type="number" class="form-input" id="f-qty"
+                            placeholder="e.g., 100" min="1"
+                            oninput="checkWeekLimitLive()">
+                        <div class="error-msg" id="err-qty"></div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">
+                            No. of Lot <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-lot"
+                            placeholder="e.g., LOT-2024-001"
+                            oninput="checkWeekLimitLive()">
+                        <div class="error-msg" id="err-lot"></div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Special Instructions (Optional)</label>
+                        <textarea class="form-textarea" id="f-notes"
+                            placeholder="Additional notes..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="form-buttons">
+                <button class="btn btn-success" id="save-btn" onclick="saveProject()">
+                    &#128190; Save Project
+                </button>
+                <button class="btn btn-ghost" onclick="clearForm()">
+                    &#8635; Clear Form
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===== RIGHT CONTENT ===== -->
+        <div class="right-content">
+            <!-- Tabs -->
+            <div class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('calendar')" id="tab-calendar">
+                    &#128197; Weekly Calendar
+                </button>
+                <button class="tab-btn" onclick="switchTab('list')" id="tab-list">
+                    &#128203; Project List
+                </button>
+            </div>
+
+            <!-- ===== CALENDAR TAB ===== -->
+            <div class="tab-content active" id="tab-content-calendar">
+                <div class="calendar-nav">
+                    <div class="cal-nav-btns">
+                        <button class="btn btn-ghost btn-sm" onclick="prevWeek()">&#9664; Prev</button>
+                        <button class="btn btn-accent2 btn-sm" onclick="goToToday()">Today</button>
+                        <button class="btn btn-ghost btn-sm" onclick="nextWeek()">Next &#9654;</button>
+                    </div>
+                    <div class="calendar-nav-center">
+                        <div class="week-label" id="week-label">Loading...</div>
+                    </div>
+                    <div class="calendar-legend" id="calendar-legend"></div>
+                </div>
+                <div class="calendar-wrapper">
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                </div>
+            </div>
+
+            <!-- ===== LIST TAB ===== -->
+            <div class="tab-content" id="tab-content-list">
+                <div class="list-toolbar">
+                    <div class="list-toolbar-left">
+                        <div class="search-box">
+                            <span class="search-icon">&#128269;</span>
+                            <input type="text" id="search-input"
+                                placeholder="Search projects..."
+                                oninput="filterProjects()">
+                        </div>
+                        <select class="filter-select" id="filter-equipment" onchange="filterProjects()">
+                            <option value="">All Equipment</option>
+                        </select>
+                        <select class="filter-select" id="filter-pic" onchange="filterProjects()">
+                            <option value="">All UPD</option>
+                        </select>
+                    </div>
+                    <div class="list-toolbar-right">
+                        <span id="selected-count" class="selected-count"></span>
+                        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
+                            &#128465; Delete Selected
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
+                            &#128228; Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="project-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-cell">
+                                    <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                                </th>
+                                <th data-col="rowNum">#</th>
+                                <th onclick="sortTable('pjm')" data-col="pjm">PJM Name</th>
+                                <th onclick="sortTable('title')" data-col="title">Project Title</th>
+                                <th onclick="sortTable('equipment')" data-col="equipment">Equipment</th>
+                                <th onclick="sortTable('pic')" data-col="pic">PIC</th>
+                                <th onclick="sortTable('start')" data-col="start">Start</th>
+                                <th onclick="sortTable('end')" data-col="end">End</th>
+                                <th onclick="sortTable('qty')" data-col="qty">Qty</th>
+                                <th onclick="sortTable('lot')" data-col="lot">Sample Lot</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="project-tbody"></tbody>
+                    </table>
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-icon">&#128203;</div>
+                        <div class="empty-title">No Projects Found</div>
+                        <div class="empty-desc">Add a new project using the form on the left</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DETAIL MODAL ===== -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal">
+            <div class="modal-header" id="modal-header">
+                <div>
+                    <div class="modal-title" id="modal-title"></div>
+                    <div class="modal-subtitle" id="modal-subtitle"></div>
+                </div>
+                <button class="modal-close" onclick="closeModal('detail-modal')">&#10005;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer"></div>
+        </div>
+    </div>
+
+    <!-- ===== CLASH BLOCK MODAL ===== -->
+    <div class="modal-overlay" id="clash-modal">
+        <div class="modal">
+            <div class="modal-header clash-modal-header">
+                <div>
+                    <div class="modal-title">&#128683; Save Blocked</div>
+                    <div class="modal-subtitle">Resolve all clashes before saving</div>
+                </div>
+                <button class="modal-close" onclick="closeModal('clash-modal')">&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div id="clash-modal-content"></div>
+                <div class="clash-instruction">
+                    Please change the <strong>Equipment</strong>,
+                    <strong>UPD</strong>, or <strong>schedule</strong> to resolve these clashes before saving.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('clash-modal')">
+                    &#8592; Go Back &amp; Edit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ADMIN LOGIN MODAL ===== -->
+    <div class="modal-overlay" id="admin-login-modal">
+        <div class="modal admin-login-modal">
+            <div class="admin-login-header">
+                <span class="admin-login-icon">🛡️</span>
+                <div class="admin-login-title">Admin Access</div>
+                <div class="admin-login-sub">Enter admin credentials to continue</div>
+            </div>
+            <div class="admin-login-body">
+                <div class="credentials-hint">
+                    💡 <span>Demo credentials — Username: <strong>admin</strong> | Password: <strong>admin123</strong></span>
+                </div>
+                <div class="admin-login-error" id="admin-login-error">
+                    🔒 <span id="admin-login-error-msg">Invalid credentials</span>
+                </div>
+                <div class="admin-login-field">
+                    <label class="admin-login-label">Username</label>
+                    <input type="text" class="admin-login-input" id="admin-username"
+                        placeholder="Enter admin username"
+                        onkeydown="if(event.key==='Enter') attemptAdminLogin()">
+                </div>
+                <div class="admin-login-field">
+                    <label class="admin-login-label">Password</label>
+                    <input type="password" class="admin-login-input" id="admin-password"
+                        placeholder="Enter admin password"
+                        onkeydown="if(event.key==='Enter') attemptAdminLogin()">
+                </div>
+            </div>
+            <div class="admin-login-footer">
+                <button class="btn-admin-cancel" onclick="closeModal('admin-login-modal')">
+                    Cancel
+                </button>
+                <button class="btn-admin-login" onclick="attemptAdminLogin()">
+                    🔐 Login to Admin Panel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ADMIN DASHBOARD MODAL ===== -->
+    <div class="modal-overlay" id="admin-dashboard-modal">
+        <div class="modal admin-dashboard-modal">
+            <!-- Sticky Header -->
+            <div class="admin-dash-header">
+                <div class="admin-dash-header-left">
+                    <div class="admin-dash-icon">⚙️</div>
+                    <div>
+                        <div class="admin-dash-title">Admin Dashboard</div>
+                        <div class="admin-dash-sub">Weekly limit controls &amp; system configuration</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="admin-badge">ADMIN</span>
+                    <button class="modal-close" onclick="closeModal('admin-dashboard-modal')" style="color:white;">&#10005;</button>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="admin-dash-body">
+
+                <!-- Week Selector -->
+                <div class="admin-section-card">
+                    <div class="admin-section-title">
+                        <span class="title-icon">📅</span>
+                        Week Configuration Target
+                    </div>
+                    <div class="admin-section-body">
+                        <div class="week-selector">
+                            <label for="admin-week-picker">Apply limits for week of:</label>
+                            <input type="week" id="admin-week-picker"
+                                onchange="updateAdminUsageDisplay()">
+                            <button class="btn btn-ghost btn-sm" onclick="setAdminWeekToday()">
+                                Current Week
+                            </button>
+                            <span class="week-selector-note" id="admin-week-range-label"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Week Usage -->
+                <div class="admin-section-card">
+                    <div class="admin-section-title">
+                        <span class="title-icon">📊</span>
+                        Current Usage — Selected Week
+                    </div>
+                    <div class="admin-section-body">
+                        <div class="usage-stats-grid" id="admin-usage-grid">
+                            <!-- Filled by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Limit Controls -->
+                <div class="admin-section-card">
+                    <div class="admin-section-title">
+                        <span class="title-icon">🎛️</span>
+                        Weekly Limit Settings
+                        <span style="font-size:11px;color:#94a3b8;font-weight:400;margin-left:8px;">
+                            Toggle ON to enforce a limit
+                        </span>
+                    </div>
+                    <div class="admin-section-body">
+                        <div class="limit-controls-grid">
+                            <!-- Max Projects -->
+                            <div class="limit-control-card" id="lc-projects">
+                                <div class="limit-control-label">
+                                    <span class="limit-control-icon">📁</span>
+                                    Max Projects / Week
+                                </div>
+                                <div class="limit-value-row">
+                                    <input type="number" class="limit-input" id="limit-projects"
+                                        min="1" max="999" value="10"
+                                        onchange="refreshUsageColors()">
+                                </div>
+                                <div class="limit-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="limit-projects-enabled"
+                                            onchange="onLimitToggle('projects')">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span class="toggle-label" id="limit-projects-label">Disabled</span>
+                                </div>
+                            </div>
+
+                            <!-- Max Lots -->
+                            <div class="limit-control-card" id="lc-lots">
+                                <div class="limit-control-label">
+                                    <span class="limit-control-icon">🗂️</span>
+                                    Max No. of Lot / Week
+                                </div>
+                                <div class="limit-value-row">
+                                    <input type="number" class="limit-input" id="limit-lots"
+                                        min="1" max="9999" value="50"
+                                        onchange="refreshUsageColors()">
+                                </div>
+                                <div class="limit-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="limit-lots-enabled"
+                                            onchange="onLimitToggle('lots')">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span class="toggle-label" id="limit-lots-label">Disabled</span>
+                                </div>
+                            </div>
+
+                            <!-- Max Quantity -->
+                            <div class="limit-control-card" id="lc-qty">
+                                <div class="limit-control-label">
+                                    <span class="limit-control-icon">🔢</span>
+                                    Max Quantity / Week
+                                </div>
+                                <div class="limit-value-row">
+                                    <input type="number" class="limit-input" id="limit-qty"
+                                        min="1" max="99999" value="500"
+                                        onchange="refreshUsageColors()">
+                                </div>
+                                <div class="limit-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="limit-qty-enabled"
+                                            onchange="onLimitToggle('qty')">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span class="toggle-label" id="limit-qty-label">Disabled</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Log -->
+                <div class="admin-section-card">
+                    <div class="admin-section-title">
+                        <span class="title-icon">📋</span>
+                        Admin Action Log
+                        <button class="btn btn-ghost btn-sm"
+                            style="margin-left:auto;font-size:11px;"
+                            onclick="clearAdminLog()">
+                            Clear Log
+                        </button>
+                    </div>
+                    <div class="admin-section-body" style="padding-top:8px;padding-bottom:8px;">
+                        <ul class="admin-log-list" id="admin-log-list">
+                            <li class="admin-log-item">
+                                <div class="admin-log-empty">No actions recorded yet.</div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div><!-- /admin-dash-body -->
+
+            <!-- Sticky Footer -->
+            <div class="admin-dash-footer">
+                <button class="btn-admin-logout" onclick="adminLogout()">
+                    🔓 Logout Admin
+                </button>
+                <span class="save-feedback" id="admin-save-feedback">✅ Settings saved!</span>
+                <button class="btn-reset-limits" onclick="resetLimitsToDefault()">
+                    ↺ Reset Defaults
+                </button>
+                <button class="btn-save-limits" onclick="saveLimits()">
+                    💾 Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== LIMIT EXCEEDED MODAL ===== -->
+    <div class="modal-overlay" id="limit-exceeded-modal">
+        <div class="modal" style="max-width:480px;">
+            <div class="limit-exceeded-header">
+                <div>
+                    <div class="modal-title">🚫 Weekly Limit Exceeded</div>
+                    <div class="modal-subtitle">This project cannot be saved</div>
+                </div>
+                <button class="modal-close" onclick="closeModal('limit-exceeded-modal')" style="color:white;">&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div id="limit-exceeded-content"></div>
+                <div class="clash-instruction" style="margin-top:12px;">
+                    Contact your <strong>Admin</strong> to increase the weekly limit,
+                    or adjust the project's <strong>quantity</strong>, <strong>lot</strong>,
+                    or <strong>schedule</strong> to fit within the current limit.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('limit-exceeded-modal')">
+                    ← Go Back &amp; Edit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="script.js"></script>
+    <script>
+    /* ============================================================
+       ADMIN MODULE — Weekly Limit Management
+       ============================================================ */
+
+    /* ---------- State ---------- */
+    const ADMIN_CREDENTIALS = {
+        username: 'admin',
+        password: 'admin123'
+    };
+
+    const DEFAULT_LIMITS = {
+        projects: { value: 10,  enabled: false },
+        lots:     { value: 50,  enabled: false },
+        qty:      { value: 500, enabled: false }
+    };
+
+    let adminState = {
+        isAuthenticated: false,
+        limits: JSON.parse(localStorage.getItem('pjm_admin_limits') || 'null')
+                || JSON.parse(JSON.stringify(DEFAULT_LIMITS)),
+        log: JSON.parse(localStorage.getItem('pjm_admin_log') || '[]')
+    };
+
+    /* ---------- Helpers ---------- */
+    function getWeekKey(dateStr) {
+        /* Returns "YYYY-WNN" from a date string yyyy-mm-dd */
+        const d = dateStr ? new Date(dateStr) : new Date();
+        const jan1 = new Date(d.getFullYear(), 0, 1);
+        const week = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+    }
+
+    function currentWeekKey() {
+        return getWeekKey(null);
+    }
+
+    function weekKeyToRange(wk) {
+        /* "2024-W22" → "27 May – 02 Jun 2024" */
+        if (!wk) return '';
+        const [year, weekNum] = wk.split('-W');
+        const jan1 = new Date(Number(year), 0, 1);
+        const dayOfWeek = jan1.getDay(); /* 0=Sun */
+        const daysToFirstMonday = (dayOfWeek <= 1 ? 1 - dayOfWeek : 8 - dayOfWeek);
+        const firstMonday = new Date(jan1);
+        firstMonday.setDate(jan1.getDate() + daysToFirstMonday + (Number(weekNum) - 1) * 7);
+        const lastSunday = new Date(firstMonday);
+        lastSunday.setDate(firstMonday.getDate() + 6);
+        const fmt = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        return `${fmt(firstMonday)} – ${fmt(lastSunday)}`;
+    }
+
+    function saveAdminState() {
+        localStorage.setItem('pjm_admin_limits', JSON.stringify(adminState.limits));
+        localStorage.setItem('pjm_admin_log', JSON.stringify(adminState.log));
+    }
+
+    function addAdminLog(msg) {
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const date = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        adminState.log.unshift({ msg, time: `${date} ${time}` });
+        if (adminState.log.length > 50) adminState.log.pop();
+        saveAdminState();
+        renderAdminLog();
+    }
+
+    /* ---------- Get weekly usage from projects array ---------- */
+    function getWeekUsage(weekKey) {
+        /* Relies on global `projects` array from script.js */
+        const arr = (typeof projects !== 'undefined') ? projects : [];
+        let projectCount = 0;
+        let lotCount     = 0;
+        let qtyTotal     = 0;
+
+        arr.forEach(p => {
+            const pWeek = getWeekKey(p.start ? p.start.split('T')[0] : '');
+            if (pWeek === weekKey) {
+                projectCount++;
+                /* Count lots: try to parse number, else count as 1 */
+                const lotNum = parseInt(p.lot) || 1;
+                lotCount += lotNum;
+                qtyTotal += Number(p.qty) || 0;
+            }
+        });
+        return { projectCount, lotCount, qtyTotal };
+    }
+
+    /* ---------- Admin Login ---------- */
+    function openAdminLogin() {
+        if (adminState.isAuthenticated) {
+            openAdminDashboard();
+            return;
+        }
+        document.getElementById('admin-username').value = '';
+        document.getElementById('admin-password').value = '';
+        document.getElementById('admin-login-error').style.display = 'none';
+        openModal('admin-login-modal');
+        setTimeout(() => document.getElementById('admin-username').focus(), 200);
+    }
+
+    function attemptAdminLogin() {
+        const user = document.getElementById('admin-username').value.trim();
+        const pass = document.getElementById('admin-password').value;
+        const errEl = document.getElementById('admin-login-error');
+        const errMsg = document.getElementById('admin-login-error-msg');
+
+        if (!user || !pass) {
+            errMsg.textContent = 'Please enter both username and password.';
+            errEl.style.display = 'flex';
+            return;
+        }
+        if (user === ADMIN_CREDENTIALS.username && pass === ADMIN_CREDENTIALS.password) {
+            adminState.isAuthenticated = true;
+            errEl.style.display = 'none';
+            closeModal('admin-login-modal');
+            addAdminLog('Admin logged in.');
+            openAdminDashboard();
+        } else {
+            errMsg.textContent = 'Invalid username or password. Please try again.';
+            errEl.style.display = 'flex';
+            document.getElementById('admin-password').value = '';
+            document.getElementById('admin-password').focus();
+        }
+    }
+
+    function adminLogout() {
+        addAdminLog('Admin logged out.');
+        adminState.isAuthenticated = false;
+        closeModal('admin-dashboard-modal');
+        showToast('Logged out of Admin Dashboard.', 'info');
+    }
+
+    /* ---------- Open Dashboard ---------- */
+    function openAdminDashboard() {
+        loadLimitsIntoForm();
+        setAdminWeekToday();
+        renderAdminLog();
+        openModal('admin-dashboard-modal');
+    }
+
+    /* ---------- Load limits into form fields ---------- */
+    function loadLimitsIntoForm() {
+        const L = adminState.limits;
+
+        document.getElementById('limit-projects').value         = L.projects.value;
+        document.getElementById('limit-projects-enabled').checked = L.projects.enabled;
+
+        document.getElementById('limit-lots').value             = L.lots.value;
+        document.getElementById('limit-lots-enabled').checked   = L.lots.enabled;
+
+        document.getElementById('limit-qty').value              = L.qty.value;
+        document.getElementById('limit-qty-enabled').checked    = L.qty.enabled;
+
+        /* Update labels */
+        ['projects', 'lots', 'qty'].forEach(k => onLimitToggle(k, true));
+    }
+
+    /* ---------- Toggle label update ---------- */
+    function onLimitToggle(key, silent) {
+        const cb    = document.getElementById(`limit-${key}-enabled`);
+        const label = document.getElementById(`limit-${key}-label`);
+        const input = document.getElementById(`limit-${key}`);
+        if (cb.checked) {
+            label.textContent = 'Enabled';
+            label.classList.add('enabled');
+            input.disabled = false;
+        } else {
+            label.textContent = 'Disabled';
+            label.classList.remove('enabled');
+            input.disabled = false; /* still allow changing value even if disabled */
+        }
+        if (!silent) refreshUsageColors();
+    }
+
+    /* ---------- Set admin week picker to current week ---------- */
+    function setAdminWeekToday() {
+        const now   = new Date();
+        const year  = now.getFullYear();
+        const jan1  = new Date(year, 0, 1);
+        const week  = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        const wkStr = `${year}-W${String(week).padStart(2, '0')}`;
+        document.getElementById('admin-week-picker').value = wkStr;
+        updateAdminUsageDisplay();
+    }
+
+    /* ---------- Update usage display ---------- */
+    function updateAdminUsageDisplay() {
+        const wkInput = document.getElementById('admin-week-picker').value;
+        const label   = document.getElementById('admin-week-range-label');
+        label.textContent = wkInput ? weekKeyToRange(wkInput) : '';
+        refreshUsageColors();
+    }
+
+    function refreshUsageColors() {
+        const wkInput = document.getElementById('admin-week-picker').value;
+        const usage   = getWeekUsage(wkInput);
+        const L       = adminState.limits;
+
+        /* Read live values from inputs (may not be saved yet) */
+        const liveProjects = {
+            value:   parseInt(document.getElementById('limit-projects').value) || L.projects.value,
+            enabled: document.getElementById('limit-projects-enabled').checked
+        };
+        const liveLots = {
+            value:   parseInt(document.getElementById('limit-lots').value) || L.lots.value,
+            enabled: document.getElementById('limit-lots-enabled').checked
+        };
+        const liveQty = {
+            value:   parseInt(document.getElementById('limit-qty').value) || L.qty.value,
+            enabled: document.getElementById('limit-qty-enabled').checked
+        };
+
+        const grid = document.getElementById('admin-usage-grid');
+        grid.innerHTML = '';
+
+        const cards = [
+            {
+                icon: '📁',
+                label: 'Projects',
+                current: usage.projectCount,
+                limit: liveProjects.value,
+                enabled: liveProjects.enabled
+            },
+            {
+                icon: '🗂️',
+                label: 'No. of Lots',
+                current: usage.lotCount,
+                limit: liveLots.value,
+                enabled: liveLots.enabled
+            },
+            {
+                icon: '🔢',
+                label: 'Quantity',
+                current: usage.qtyTotal,
+                limit: liveQty.value,
+                enabled: liveQty.enabled
+            }
+        ];
+
+        cards.forEach(c => {
+            const pct        = c.enabled ? Math.min((c.current / c.limit) * 100, 100) : 0;
+            const isOver     = c.enabled && c.current >= c.limit;
+            const isNear     = c.enabled && !isOver && pct >= 75;
+            const statusClass = !c.enabled ? '' : isOver ? 'over-limit' : isNear ? 'near-limit' : 'ok-limit';
+            const barClass    = !c.enabled ? 'ok' : isOver ? 'over' : isNear ? 'near' : 'ok';
+            const limitText   = c.enabled
+                ? (isOver
+                    ? `⚠️ ${c.current} / ${c.limit} — OVER LIMIT`
+                    : `${c.current} / ${c.limit} used`)
+                : `${c.current} used (no limit)`;
+            const limitClass  = !c.enabled ? '' : isOver ? 'over' : isNear ? 'near' : 'ok';
+
+            grid.innerHTML += `
+                <div class="usage-stat-card ${statusClass}">
+                    <div class="usage-stat-icon">${c.icon}</div>
+                    <div class="usage-stat-value">${c.current}</div>
+                    <div class="usage-stat-label">${c.label}</div>
+                    <div class="usage-stat-limit ${limitClass}">${limitText}</div>
+                    ${c.enabled ? `
+                    <div class="usage-progress">
+                        <div class="usage-progress-bar ${barClass}" style="width:${pct}%"></div>
+                    </div>` : ''}
+                </div>`;
+        });
+    }
+
+    /* ---------- Save limits ---------- */
+    function saveLimits() {
+        const newLimits = {
+            projects: {
+                value:   Math.max(1, parseInt(document.getElementById('limit-projects').value) || 10),
+                enabled: document.getElementById('limit-projects-enabled').checked
+            },
+            lots: {
+                value:   Math.max(1, parseInt(document.getElementById('limit-lots').value) || 50),
+                enabled: document.getElementById('limit-lots-enabled').checked
+            },
+            qty: {
+                value:   Math.max(1, parseInt(document.getElementById('limit-qty').value) || 500),
+                enabled: document.getElementById('limit-qty-enabled').checked
+            }
+        };
+
+        /* Build log message */
+        const changes = [];
+        (['projects', 'lots', 'qty']).forEach(k => {
+            const old = adminState.limits[k];
+            const nw  = newLimits[k];
+            if (old.value !== nw.value || old.enabled !== nw.enabled) {
+                const label = k === 'projects' ? 'Max Projects' : k === 'lots' ? 'Max Lots' : 'Max Qty';
+                changes.push(`${label}: ${nw.enabled ? `limit=${nw.value}` : 'disabled'}`);
+            }
+        });
+
+        adminState.limits = newLimits;
+        saveAdminState();
+        refreshUsageColors();
+
+        /* Refresh live banner on form */
+        if (typeof checkWeekLimitLive === 'function') checkWeekLimitLive();
+
+        /* Feedback */
+        const fb = document.getElementById('admin-save-feedback');
+        fb.classList.add('visible');
+        setTimeout(() => fb.classList.remove('visible'), 2500);
+
+        if (changes.length > 0) {
+            addAdminLog(`Limits updated — ${changes.join(' | ')}`);
+            showToast('✅ Weekly limits saved successfully!', 'success');
+        } else {
+            showToast('No changes detected.', 'info');
+        }
+    }
+
+    /* ---------- Reset to defaults ---------- */
+    function resetLimitsToDefault() {
+        if (!confirm('Reset all limits to default values?')) return;
+        adminState.limits = JSON.parse(JSON.stringify(DEFAULT_LIMITS));
+        saveAdminState();
+        loadLimitsIntoForm();
+        refreshUsageColors();
+        addAdminLog('Limits reset to defaults.');
+        showToast('↺ Limits reset to defaults.', 'info');
+    }
+
+    /* ---------- Render action log ---------- */
+    function renderAdminLog() {
+        const ul = document.getElementById('admin-log-list');
+        if (!ul) return;
+        if (adminState.log.length === 0) {
+            ul.innerHTML = '<li><div class="admin-log-empty">No actions recorded yet.</div></li>';
+            return;
+        }
+        ul.innerHTML = adminState.log.map(entry => `
+            <li class="admin-log-item">
+                <div class="admin-log-dot"></div>
+                <div class="admin-log-msg">${entry.msg}</div>
+                <div class="admin-log-time">${entry.time}</div>
+            </li>`).join('');
+    }
+
+    /* ---------- Clear log ---------- */
+    function clearAdminLog() {
+        adminState.log = [];
+        saveAdminState();
+        renderAdminLog();
+    }
+
+    /* ============================================================
+       LIMIT ENFORCEMENT — called by saveProject() hook
+       ============================================================ */
+
+    /**
+     * checkWeekLimits(startDate, qty, lot)
+     * Returns array of violation objects. Empty = all good.
+     */
+    function checkWeekLimits(startDate, qty, lot, excludeId) {
+        const L = adminState.limits;
+        if (!L.projects.enabled && !L.lots.enabled && !L.qty.enabled) return [];
+
+        const weekKey = getWeekKey(startDate ? startDate.split('T')[0] : '');
+        const usage   = getWeekUsage(weekKey);
+
+        /* If editing, we need to subtract the current record being replaced */
+        let adj = { projectCount: usage.projectCount, lotCount: usage.lotCount, qtyTotal: usage.qtyTotal };
+        if (excludeId && typeof projects !== 'undefined') {
+            const existing = projects.find(p => p.id === excludeId);
+            if (existing) {
+                const eWeek = getWeekKey(existing.start ? existing.start.split('T')[0] : '');
+                if (eWeek === weekKey) {
+                    adj.projectCount = Math.max(0, adj.projectCount - 1);
+                    adj.lotCount     = Math.max(0, adj.lotCount - (parseInt(existing.lot) || 1));
+                    adj.qtyTotal     = Math.max(0, adj.qtyTotal - (Number(existing.qty) || 0));
+                }
+            }
+        }
+
+        const violations = [];
+        const newLotNum  = parseInt(lot) || 1;
+        const newQty     = Number(qty) || 0;
+
+        if (L.projects.enabled && (adj.projectCount + 1) > L.projects.value) {
+            violations.push({
+                type: 'Projects',
+                icon: '📁',
+                current: adj.projectCount,
+                adding: 1,
+                limit: L.projects.value,
+                total: adj.projectCount + 1
+            });
+        }
+        if (L.lots.enabled && (adj.lotCount + newLotNum) > L.lots.value) {
+            violations.push({
+                type: 'No. of Lots',
+                icon: '🗂️',
+                current: adj.lotCount,
+                adding: newLotNum,
+                limit: L.lots.value,
+                total: adj.lotCount + newLotNum
+            });
+        }
+        if (L.qty.enabled && (adj.qtyTotal + newQty) > L.qty.value) {
+            violations.push({
+                type: 'Quantity',
+                icon: '🔢',
+                current: adj.qtyTotal,
+                adding: newQty,
+                limit: L.qty.value,
+                total: adj.qtyTotal + newQty
+            });
+        }
+        return violations;
+    }
+
+    /**
+     * showLimitExceededModal(violations, weekKey)
+     * Displays the limit-exceeded blocking modal.
+     */
+    function showLimitExceededModal(violations, weekKey) {
+        const content = document.getElementById('limit-exceeded-content');
+        const range   = weekKeyToRange(weekKey);
+        content.innerHTML = `
+            <p style="font-size:13px;color:#374151;margin-bottom:12px;">
+                Saving this project would exceed the admin-set weekly limit(s)
+                for week <strong>${weekKey}</strong>${range ? ` (${range})` : ''}:
+            </p>
+            <div class="limit-block-details">
+                ${violations.map(v => `
+                    <div class="limit-block-row">
+                        <span class="limit-exceeded-icon">${v.icon}</span>
+                        <span class="limit-block-name"><strong>${v.type}</strong></span>
+                        <span class="limit-block-stat">
+                            ${v.current} + ${v.adding} = ${v.total} &gt; limit of ${v.limit}
+                        </span>
+                    </div>`).join('')}
+            </div>`;
+        openModal('limit-exceeded-modal');
+    }
+
+    /* ============================================================
+       LIVE WARNING BANNER (in sidebar form)
+       ============================================================ */
+    function checkWeekLimitLive() {
+        const banner  = document.getElementById('limit-warning-banner');
+        const bannerTxt = document.getElementById('limit-warning-text');
+        const startDate = document.getElementById('f-start-date').value;
+        const qty       = document.getElementById('f-qty').value;
+        const lot       = document.getElementById('f-lot').value;
+
+        if (!startDate) { banner.classList.remove('visible'); return; }
+
+        const L = adminState.limits;
+        if (!L.projects.enabled && !L.lots.enabled && !L.qty.enabled) {
+            banner.classList.remove('visible');
+            return;
+        }
+
+        const weekKey = getWeekKey(startDate);
+        const usage   = getWeekUsage(weekKey);
+        const warnings = [];
+
+        if (L.projects.enabled) {
+            const rem = L.projects.value - usage.projectCount;
+            if (rem <= 0) {
+                warnings.push(`<strong>Projects:</strong> weekly limit of ${L.projects.value} reached (${usage.projectCount} used)`);
+            } else if (rem <= 2) {
+                warnings.push(`<strong>Projects:</strong> only ${rem} slot(s) left this week`);
+            }
+        }
+        if (L.lots.enabled && lot) {
+            const newLotNum = parseInt(lot) || 1;
+            const rem = L.lots.value - usage.lotCount;
+            if ((usage.lotCount + newLotNum) > L.lots.value) {
+                warnings.push(`<strong>Lots:</strong> ${usage.lotCount} used, limit is ${L.lots.value}, adding ${newLotNum} would exceed`);
+            } else if (rem <= 5) {
+                warnings.push(`<strong>Lots:</strong> only ${rem} lot(s) remaining this week`);
+            }
+        }
+        if (L.qty.enabled && qty) {
+            const newQty = Number(qty) || 0;
+            const rem = L.qty.value - usage.qtyTotal;
+            if ((usage.qtyTotal + newQty) > L.qty.value) {
+                warnings.push(`<strong>Quantity:</strong> ${usage.qtyTotal} used, limit is ${L.qty.value}, adding ${newQty} would exceed`);
+            } else if (rem <= 50) {
+                warnings.push(`<strong>Quantity:</strong> only ${rem} units remaining this week`);
+            }
+        }
+
+        if (warnings.length > 0) {
+            bannerTxt.innerHTML = warnings.join('<br>');
+            banner.classList.add('visible');
+        } else {
+            banner.classList.remove('visible');
+        }
+    }
+
+    /* ============================================================
+       HOOK INTO saveProject()
+       We patch window.saveProject to run limit checks first.
+       ============================================================ */
+    document.addEventListener('DOMContentLoaded', () => {
+        /* Show Admin button — in a real app this would check the logged-in user role.
+           For demo we always show it so testers can find it. */
+        const adminBtn = document.getElementById('admin-dash-btn');
+        if (adminBtn) adminBtn.style.display = 'flex';
+
+        /* Patch saveProject after script.js has loaded */
+        const _origSave = window.saveProject;
+        if (typeof _origSave === 'function') {
+            window.saveProject = function () {
+                /* Pull values from form */
+                const startDate = document.getElementById('f-start-date').value;
+                const qty       = document.getElementById('f-qty').value;
+                const lot       = document.getElementById('f-lot').value;
+
+                /* Run limit check */
+                const violations = checkWeekLimits(startDate, qty, lot);
+                if (violations.length > 0) {
+                    const weekKey = getWeekKey(startDate);
+                    showLimitExceededModal(violations, weekKey);
+                    return; /* Block save */
+                }
+                /* All good — call original */
+                _origSave.call(this);
+            };
+        }
+
+        /* Initial live check */
+        checkWeekLimitLive();
+    });
+
+    /* ============================================================
+       MODAL HELPERS (work alongside any existing openModal / closeModal)
+       ============================================================ */
+    function openModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('active');
+    }
+    function closeModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+    }
+
+    /* Toast fallback in case script.js doesn't define it */
+    if (typeof window.showToast !== 'function') {
+        window.showToast = function (msg, type) {
+            const c = document.getElementById('toast-container');
+            if (!c) return;
+            const t = document.createElement('div');
+            t.className = `toast toast-${type || 'info'}`;
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => t.remove(), 3500);
+        };
+    }
+    </script>
+</body>
+</html>

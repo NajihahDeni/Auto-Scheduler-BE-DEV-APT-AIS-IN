@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Build Plan Management System</title>
+
+    <!-- ✅ 1. Supabase CDN FIRST -->
+    <script src="supabase.js"></script>
+
+    <!-- ✅ 2. Supabase config (creates window.db) -->
+    <script src="supabase-config.js"></script>
+
+    <!-- ✅ 3. Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- ✅ 4. Page Guard — runs before DOM renders -->
+    <script>
+    "use strict";
+    var ALLOWED_ROLES = ["sample coordinator", "pjm"];
+
+
+    "use strict";
+
+/* ── Roles allowed on THIS page ── */
+var ALLOWED_ROLES = ["sample coordinator", "pjm"]; // ✅ both allowed
+
+(async function guardPage() {
+    console.log("🔍 GUARD: Started");
+
+    /* ── Wait for window.db ── */
+    await new Promise(function (resolve, reject) {
+        if (window.db && typeof window.db.from === "function") {
+            resolve(); return;
+        }
+        let attempts = 0;
+        const interval = setInterval(function () {
+            attempts++;
+            if (window.db && typeof window.db.from === "function") {
+                clearInterval(interval);
+                resolve();
+            } else if (attempts >= 50) {
+                clearInterval(interval);
+                reject(new Error("DB timeout"));
+            }
+        }, 100);
+    }).catch(function () {
+        console.error("🔍 GUARD: window.db never ready");
+        window.location.href = "login.html";
+        throw new Error("stop");
+    });
+
+    try {
+        /* ── STEP 1: Check sessionStorage ── */
+        const stored = sessionStorage.getItem("pjm_user");
+        console.log("🔍 GUARD: sessionStorage =", stored);
+
+        if (stored) {
+            const cachedUser = JSON.parse(stored);
+            if (cachedUser && ALLOWED_ROLES.includes(cachedUser.role)) {
+    window.currentUser = cachedUser;
+    populateUserBar();
+    return;
+} else {
+    sessionStorage.removeItem("pjm_user");
+    window.location.href = "login.html";
+    return;
+}
+        }
+
+        /* ── STEP 2: No session — try getSession() ── */
+        const { data, error } = await Promise.race([
+            window.db.auth.getSession(),
+            new Promise(function (resolve) {
+                setTimeout(function () {
+                    resolve({ data: { session: null }, error: null });
+                }, 5000);
+            })
+        ]);
+
+        if (error || !data?.session) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        /* ── STEP 3: Session exists — check DB role ── */
+        const { data: user, error: userError } =
+            await Promise.race([
+                window.db
+                    .from("users")
+                    .select("role, is_active, name")
+                    .eq("id", data.session.user.id)
+                    .single(),
+                new Promise(function (resolve) {
+                    setTimeout(function () {
+                        resolve({
+                            data : null,
+                            error: { message: "timeout" }
+                        });
+                    }, 8000);
+                })
+            ]);
+
+        if (userError || !user) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        if (!user.is_active) {
+            await window.db.auth.signOut();
+            window.location.href = "login.html";
+            return;
+        }
+
+        /* ── role not in allowed list → redirect ── */
+        if (!ALLOWED_ROLES.includes(user.role)) {
+        window.location.href = "login.html";
+        return;
+        }
+
+        window.currentUser = {
+            id   : data.session.user.id,
+            email: data.session.user.email,
+            name : user.name ||
+                   data.session.user.email.split("@")[0],
+            role : user.role
+        };
+
+        sessionStorage.setItem("pjm_user",
+            JSON.stringify(window.currentUser));
+
+        console.log("🔍 GUARD: ✅ Access granted →",
+            window.currentUser);
+
+        populateUserBar();
+
+    } catch (err) {
+        console.error("🔍 GUARD: ❌ Error →", err.message);
+        window.location.href = "login.html";
+    }
+})();
+
+/* ── Populate user bar ── */
+function populateUserBar() {
+    if (!document.getElementById("user-name")) {
+        setTimeout(populateUserBar, 100);
+        return;
+    }
+    const u = window.currentUser;
+    if (!u) return;
+
+    const nameEl   = document.getElementById("user-name");
+    const roleEl   = document.getElementById("user-role");
+    const avatarEl = document.getElementById("user-avatar");
+
+    if (nameEl)   nameEl.textContent   = u.name;
+    if (roleEl)   roleEl.textContent   = u.role;
+    if (avatarEl) avatarEl.textContent = u.name.charAt(0).toUpperCase();
+
+    /* ── show Admin tab only for coordinators ── */
+    const adminTab = document.getElementById("tab-admin");
+    if (adminTab) {
+        adminTab.style.display =
+            u.role === "sample coordinator"
+                ? "inline-flex"
+                : "none";
+    }
+
+    console.log("🔍 GUARD: ✅ User bar populated →", u.name);
+}
+    </script>
+</head>
+
+<body>
+
+<!-- ===================================================== -->
+<!-- USER BAR                                              -->
+<!-- ===================================================== -->
+<div class="user-bar" id="user-bar">
+    <div class="user-bar-left">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-info">
+            <div class="user-name" id="user-name">Loading...</div>
+            <div class="user-role" id="user-role"></div>
+        </div>
+    </div>
+    <button class="logout-btn" id="logout-btn">
+        🔓 Logout
+    </button>
+</div>
+
+<!-- ===================================================== -->
+<!-- HEADER                                                -->
+<!-- ===================================================== -->
+<header class="header">
+    <div class="header-left">
+        <div class="header-logo">
+            <div class="logo-icon">&#9881;</div>
+            <div>
+                <div class="header-title">PJM Build Plan</div>
+                <div class="header-subtitle">
+                    Project Management System
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="header-stats">
+            <div class="stat-badge">
+                <span>Total Projects:</span>
+                <span class="stat-num" id="stat-total">0</span>
+            </div>
+            <div class="stat-badge">
+                <span>This Week:</span>
+                <span class="stat-num" id="stat-week">0</span>
+            </div>
+            <div class="stat-badge">
+                <span>Equipment In Use:</span>
+                <span class="stat-num" id="stat-equipment">0</span>
+            </div>
+        </div>
+        <div class="current-date" id="current-date"></div>
+    </div>
+</header>
+
+<!-- ===================================================== -->
+<!-- MAIN                                                  -->
+<!-- ===================================================== -->
+<div class="main-container">
+
+    <!-- =============================================== -->
+    <!-- SIDEBAR FORM                                    -->
+    <!-- =============================================== -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+        </div>
+
+        <div class="form-scroll">
+            <form id="project-form" novalidate>
+
+                <!-- ── PROJECT INFO ──────────────────────── -->
+<div class="section-divider">
+    <span class="section-label">Project Info</span>
+</div>
+
+<!-- PJM Name -->
+<div class="field-group">
+    <label class="field-label" for="f-pjm_name">
+        PJM Name
+        <span class="field-required">*</span>
+    </label>
+    <input type="text"
+           class="form-input"
+           id="f-pjm_name"
+           placeholder="e.g., 1"
+           autocomplete="off"
+           readonly>
+    <div class="error-msg" id="err-pjm_name"></div>
+</div>
+
+<!-- Project Title -->
+<div class="field-group">
+    <label class="field-label" for="f-proj_title">
+        Project Title
+        <span class="field-required">*</span>
+    </label>
+    <input type="text"
+           class="form-input"
+           id="f-proj_title"
+           placeholder="Enter project title"
+           autocomplete="off">
+    <div class="error-msg" id="err-proj_title"></div>
+</div>
+
+<!-- Platform combobox -->
+<div class="field-group">
+    <label class="field-label" for="f-platform">
+        Platform
+        <span class="field-required">*</span>
+        <span class="loading-badge" id="platform-loading">⏳</span>
+    </label>
+    <div class="combo-wrapper" id="platform-combo-wrapper">
+        <input type="text"
+               class="form-input combo-input"
+               id="f-platform"
+               placeholder="Select platform…"
+               autocomplete="off"
+               readonly>
+        <span class="combo-chevron">&#9660;</span>
+        <div class="combo-dropdown hidden" id="platform-dropdown">
+        </div>
+    </div>
+    <div class="error-msg" id="err-platform"></div>
+</div>
+
+<!-- Equipment combobox -->
+<div class="field-group">
+    <label class="field-label" for="f-equipment">
+        Equipment
+        <span class="field-required">*</span>
+        <span class="loading-badge" id="equipment-loading">⏳</span>
+    </label>
+    <div class="combo-wrapper" id="equipment-combo-wrapper">
+        <input type="text"
+               class="form-input combo-input"
+               id="f-equipment"
+               placeholder="Select or search equipment…"
+               autocomplete="off">
+        <div class="combo-dropdown hidden" id="equipment-dropdown">
+        </div>
+    </div>
+    <div class="error-msg" id="err-equipment"></div>
+</div>
+
+<!-- PIC / UPD combobox -->
+<div class="field-group">
+    <label class="field-label" for="f-upd">
+        PIC / UPD
+        <span class="field-required">*</span>
+        <span class="loading-badge" id="upd-loading">⏳</span>
+    </label>
+    <div class="combo-wrapper" id="upd-combo-wrapper">
+        <input type="text"
+               class="form-input combo-input"
+               id="f-upd"
+               placeholder="Select PIC (UPD)…"
+               autocomplete="off"
+               readonly>
+        <span class="combo-chevron">&#9660;</span>
+        <div class="combo-dropdown hidden" id="upd-dropdown">
+        </div>
+    </div>
+    <div class="error-msg" id="err-upd"></div>
+</div>
+
+<!-- ── SCHEDULE ───────────────────────────── -->
+<div class="section-divider">
+    <span class="section-label">Schedule</span>
+</div>
+
+        <!-- Start -->
+        <div class="field-group">
+                        <label class="field-label">
+                            Start Date &amp; Time
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-start-date"
+                                onchange="liveConflictCheck()">
+                            <select class="form-select time-select"
+                                id="f-start-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-start"></div>
+                    </div>
+        <!-- End -->
+        <div class="field-group">
+                        <label class="field-label">
+                            End Date &amp; Time
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-end-date"
+                                onchange="liveConflictCheck()">
+                            <select class="form-select time-select"
+                                id="f-end-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-end"></div>
+                    </div>
+
+<!-- Live Clash Alert -->
+<div class="live-conflict-box hidden" id="live-conflict-box">
+    <div class="live-conflict-title">
+        &#9888; Scheduling Clash Detected
+    </div>
+    <div id="live-conflict-list"></div>
+</div>
+
+<!-- ── QUANTITY & LOT ─────────────────────── -->
+<div class="qty-lot-row">
+
+    <!-- Quantity -->
+    <div class="field-group qty-lot-field">
+        <label class="field-label" for="f-qty">
+            Quantity
+            <span class="field-required">*</span>
+        </label>
+        <div class="qty-lot-input-wrap">
+            <input type="number"
+                   class="form-input"
+                   id="f-quantity"
+                    placeholder="e.g. 123 "
+                   onchange="liveConflictCheck()">
+
+        </div>
+        <div class="error-msg" id="err-qty"></div>
+    </div>
+
+    <!-- No. of Lot -->
+    <div class="field-group qty-lot-field">
+        <label class="field-label" for="f-lot">
+            No. of Lot
+            <span class="field-required">*</span>
+        </label>
+        <div class="qty-lot-input-wrap">
+            <input type="number"
+                   class="form-input"
+                   id="f-no_lot"
+                    placeholder="e.g. 12"
+                    onchange="liveConflictCheck()">
+
+        </div>
+        <div class="error-msg" id="err-lot"></div>
+    </div>
+
+</div>
+
+<!-- Special Instructions -->
+<div class="field-group">
+    <label class="field-label" for="f-special_inst">
+        Special Instructions
+        <span class="field-optional">(Optional)</span>
+    </label>
+    <textarea class="form-textarea"
+              id="f-special_inst"
+              placeholder="Additional notes..."
+              rows="3">
+    </textarea>
+</div>
+
+            </form>
+        </div><!-- /form-scroll -->
+
+        <!-- Form Buttons -->
+        <div class="form-buttons">
+            <button class="btn btn-success"
+                    id="save-btn"
+                    onclick="saveProject()">
+                &#128190; Save Project
+            </button>
+            <div style="display:flex; gap:8px;">
+        <!-- ✅ NEW reuse button -->
+        <button id="reuse-btn"
+                class="btn btn-ghost"
+                onclick="reuseLastData()"
+                disabled
+                title="Reload last saved project info"
+                style="flex:1;">
+            ♻️ Reuse Last
+        </button>
+            <button class="btn btn-ghost"
+                    onclick="clearForm()">
+                &#8635; Clear Form
+            </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- =============================================== -->
+    <!-- RIGHT CONTENT                                   -->
+    <!-- =============================================== -->
+    <div class="right-content">
+
+        <!-- Tabs -->
+        <div class="tabs-header">
+            <button class="tab-btn active"
+                    id="tab-calendar"
+                    onclick="switchTab('calendar')">
+                &#128197; Weekly Calendar
+            </button>
+            <button class="tab-btn"
+                    id="tab-list"
+                    onclick="switchTab('list')">
+                &#128203; Project List
+            </button>
+            <!-- Add this after the existing tab buttons in autoscheduler.html -->
+<button class="tab-btn admin-only-tab"
+        id="tab-admin"
+        onclick="goToAdminDashboard()"
+        style="display:none">
+    &#9881; Admin Dashboard
+</button>
+        </div>
+
+        <!-- =========================================== -->
+        <!-- CALENDAR TAB                                -->
+        <!-- =========================================== -->
+        <div class="tab-content active"
+             id="tab-content-calendar">
+            <div class="calendar-nav">
+                <div class="cal-nav-btns">
+                    <button class="btn btn-ghost btn-sm"
+                            onclick="prevWeek()">
+                        &#9664; Prev
+                    </button>
+                    <button class="btn btn-accent2 btn-sm"
+                            onclick="goToToday()">
+                        Today
+                    </button>
+                    <button class="btn btn-ghost btn-sm"
+                            onclick="nextWeek()">
+                        Next &#9654;
+                    </button>
+                </div>
+                <div class="calendar-nav-center">
+                    <div class="week-label"
+                         id="week-label">
+                        Loading...
+                    </div>
+                </div>
+                <div class="calendar-legend"
+                     id="calendar-legend">
+                </div>
+            </div>
+            <div class="calendar-wrapper">
+                <div class="calendar-grid"
+                     id="calendar-grid">
+                </div>
+            </div>
+        </div>
+
+        <!-- =========================================== -->
+        <!-- LIST TAB                                    -->
+        <!-- =========================================== -->
+        <div class="tab-content"
+             id="tab-content-list">
+            <div class="list-toolbar">
+                <div class="list-toolbar-left">
+
+                    <!-- Search -->
+                    <div class="search-box">
+                        <span class="search-icon">&#128269;</span>
+                        <input type="text"
+                               id="search-input"
+                               placeholder="Search projects..."
+                               oninput="filterProjects()">
+                    </div>
+
+                    <!-- Filter: Equipment -->
+                    <select class="filter-select"
+                            id="filter-equipment"
+                            onchange="filterProjects()">
+                        <option value="">All Equipment</option>
+                    </select>
+
+                    <!-- Filter: UPD/PIC -->
+                    <select class="filter-select"
+                            id="filter-upd"
+                            onchange="filterProjects()">
+                        <option value="">All UPD</option>
+                    </select>
+
+                    <!-- Filter: Platform -->
+                    <select class="filter-select"
+                            id="filter-platform"
+                            onchange="filterProjects()">
+                        <option value="">All Platforms</option>
+                    </select>
+
+                </div>
+                <div class="list-toolbar-right">
+                    <span id="selected-count"
+                          class="selected-count">
+                    </span>
+                    <button class="btn btn-danger btn-sm"
+                            onclick="deleteSelected()">
+                        &#128465; Delete Selected
+                    </button>
+                    <button class="btn btn-ghost btn-sm"
+                            onclick="exportCSV()">
+                        &#128228; Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table" id="project-table">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell">
+                                <input type="checkbox"
+                                       id="select-all"
+                                       onchange="toggleSelectAll()">
+                            </th>
+                            <th data-col="rowNum">#</th>
+                            <th onclick="sortTable('pjm')"
+                                data-col="pjm"
+                                class="sortable">
+                                PJM Name
+                            </th>
+                            <th onclick="sortTable('title')"
+                                data-col="title"
+                                class="sortable">
+                                Project Title
+                            </th>
+                            <th onclick="sortTable('platform')"
+                                data-col="platform"
+                                class="sortable">
+                                Platform
+                            </th>
+                            <th onclick="sortTable('equipment')"
+                                data-col="equipment"
+                                class="sortable">
+                                Equipment
+                            </th>
+                            <th onclick="sortTable('upd')"
+                                data-col="upd"
+                                class="sortable">
+                                UPD
+                            </th>
+                            <th onclick="sortTable('start')"
+                                data-col="start"
+                                class="sortable">
+                                Start
+                            </th>
+                            <th onclick="sortTable('end')"
+                                data-col="end"
+                                class="sortable">
+                                End
+                            </th>
+                            <th onclick="sortTable('qty')"
+                                data-col="qty"
+                                class="sortable">
+                                Qty
+                            </th>
+                            <th onclick="sortTable('lot')"
+                                data-col="lot"
+                                class="sortable">
+                                No. of Lot
+                            </th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="project-tbody"></tbody>
+                </table>
+
+                <!-- Empty state -->
+                <div class="empty-state" id="empty-state">
+                    <div class="empty-icon">&#128203;</div>
+                    <div class="empty-title">No Projects Found</div>
+                    <div class="empty-desc">
+                        Add a new project using the form on the left
+                    </div>
+                </div>
+            </div>
+        </div><!-- /tab-content-list -->
+
+    </div><!-- /right-content -->
+</div><!-- /main-container -->
+
+<!-- ===================================================== -->
+<!-- DETAIL MODAL                                          -->
+<!-- ===================================================== -->
+<div class="modal-overlay" id="detail-modal">
+    <div class="modal">
+        <div class="modal-header" id="modal-header">
+            <div>
+                <div class="modal-title"
+                     id="modal-title">
+                </div>
+                <div class="modal-subtitle"
+                     id="modal-subtitle">
+                </div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeModal('detail-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body"  id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+    </div>
+</div>
+
+<!-- ===================================================== -->
+<!-- CLASH BLOCK MODAL                                     -->
+<!-- ===================================================== -->
+<div class="modal-overlay" id="clash-modal">
+    <div class="modal">
+        <div class="modal-header clash-modal-header">
+            <div>
+                <div class="modal-title">
+                    &#128683; Save Blocked
+                </div>
+                <div class="modal-subtitle">
+                    Resolve all clashes before saving
+                </div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeModal('clash-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <div id="clash-modal-content"></div>
+            <div class="clash-instruction">
+                Please change the <strong>Equipment</strong>,
+                <strong>UPD</strong>, or
+                <strong>schedule</strong> to resolve these
+                clashes before saving.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary"
+                    onclick="closeModal('clash-modal')">
+                &#8592; Go Back &amp; Edit
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================================================== -->
+<!-- TOAST                                                 -->
+<!-- ===================================================== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===================================================== -->
+<!-- SCRIPTS — load order matters                          -->
+<!-- ===================================================== -->
+<!-- ✅ Main app logic (uses window.db from supabase-config) -->
+<script src="script.js"></script>
+
+<!-- ===================================================== -->
+<!-- INLINE STYLES for combobox + badges                   -->
+<!-- ===================================================== -->
+<style>
+/* ── Combo wrapper ───────────────────────────────────── */
+.combo-wrapper {
+    position : relative;
+    width     : 100%;
+}
+.combo-input {
+    width         : 100%;
+    padding-right : 32px;  /* room for chevron */
+    cursor        : pointer;
+}
+.combo-chevron {
+    position       : absolute;
+    right          : 10px;
+    top            : 50%;
+    transform      : translateY(-50%);
+    font-size      : 11px;
+    color          : #64748b;
+    pointer-events : none;
+}
+
+/* ── Dropdown panel ──────────────────────────────────── */
+.combo-dropdown {
+    position         : absolute;
+    top              : calc(100% + 4px);
+    left             : 0;
+    right            : 0;
+    background       : #fff;
+    border           : 1px solid #e2e8f0;
+    border-radius    : 8px;
+    box-shadow       : 0 8px 24px rgba(0,0,0,.12);
+    max-height       : 220px;
+    overflow-y       : auto;
+    z-index          : 9999;
+    padding          : 4px 0;
+}
+.combo-dropdown.hidden { display: none; }
+
+/* ── Option rows ─────────────────────────────────────── */
+.combo-option {
+    padding    : 9px 14px;
+    font-size  : 13px;
+    color      : #1e293b;
+    cursor     : pointer;
+    transition : background .15s;
+}
+.combo-option:hover,
+.combo-option.highlighted {
+    background : #ede9fe;
+    color      : #5b21b6;
+}
+.combo-option.hidden-opt { display: none; }
+
+/* ── No-result hint ──────────────────────────────────── */
+.combo-no-result {
+    padding   : 10px 14px;
+    font-size : 12px;
+    color     : #94a3b8;
+    font-style: italic;
+}
+
+/* ── Equipment manual-mode toggle ────────────────────── */
+.combo-mode-btn {
+    display       : block;
+    width         : 100%;
+    margin-top    : 6px;
+    padding       : 5px 10px;
+    font-size     : 11px;
+    background    : #f1f5f9;
+    border        : 1px solid #e2e8f0;
+    border-radius : 6px;
+    cursor        : pointer;
+    color         : #475569;
+    text-align    : left;
+    transition    : background .15s;
+}
+.combo-mode-btn:hover  { background: #e2e8f0; }
+.combo-mode-btn.is-manual {
+    background : #fef3c7;
+    border-color: #fcd34d;
+    color      : #92400e;
+}
+.combo-mode-label {
+    display    : block;
+    font-size  : 11px;
+    color      : #94a3b8;
+    margin-top : 3px;
+}
+
+/* ── Loading badge ───────────────────────────────────── */
+.loading-badge {
+    font-size  : 11px;
+    color      : #94a3b8;
+    margin-left: 4px;
+}
+
+/* ── Clash highlight on input ────────────────────────── */
+.clash-field {
+    border-color : #ef4444 !important;
+    box-shadow   : 0 0 0 3px rgba(239,68,68,.15) !important;
+}
+
+/* ── Table badges ────────────────────────────────────── */
+.equipment-badge {
+    display        : inline-flex;
+    align-items    : center;
+    gap            : 4px;
+    background     : linear-gradient(135deg,#ecfdf5,#d1fae5);
+    color          : #065f46;
+    font-size      : 11px;
+    font-weight    : 600;
+    padding        : 3px 9px;
+    border-radius  : 20px;
+    border         : 1px solid #6ee7b7;
+    white-space    : nowrap;
+    max-width      : 180px;
+    overflow       : hidden;
+    text-overflow  : ellipsis;
+}
+.upd-badge {
+    display        : inline-flex;
+    align-items    : center;
+    gap            : 4px;
+    background     : linear-gradient(135deg,#eff6ff,#dbeafe);
+    color          : #1e40af;
+    font-size      : 11px;
+    font-weight    : 600;
+    padding        : 3px 9px;
+    border-radius  : 20px;
+    border         : 1px solid #93c5fd;
+    white-space    : nowrap;
+    max-width      : 160px;
+    overflow       : hidden;
+    text-overflow  : ellipsis;
+}
+.platform-badge {
+    display        : inline-flex;
+    align-items    : center;
+    gap            : 4px;
+    background     : linear-gradient(135deg,#ede9fe,#ddd6fe);
+    color          : #5b21b6;
+    font-size      : 11px;
+    font-weight    : 600;
+    padding        : 3px 9px;
+    border-radius  : 20px;
+    border         : 1px solid #c4b5fd;
+    white-space    : nowrap;
+    max-width      : 160px;
+    overflow       : hidden;
+    text-overflow  : ellipsis;
+}
+.project-block {
+  position: absolute;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+
+  /* background based on variables set in JS */
+  background: linear-gradient(160deg, var(--c-light), var(--c-dark));
+  border: 0px solid color-mix(in srgb, var(--c) 55%, rgb(255, 255, 255));
+  box-shadow: 0 6px 16px rgba(0,0,0,.10);
+
+  color: #fff;
+}
+
+.project-block-header {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+
+  background: var(--c-dark);
+  border-bottom: 1px solid rgba(255,255,255,.18);
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-block-body {
+  padding: 6px 8px 8px;
+  font-size: 11px;
+}
+
+.project-block-title {
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+
+.project-block-detail {
+  opacity: .92;
+  line-height: 1.1;
+}
+</style>
+
+<!-- ===================================================== -->
+<!-- INIT SCRIPT — wires logout + post-render badges       -->
+<!-- ===================================================== -->
+<script>
+"use strict";
+document.addEventListener("DOMContentLoaded", function () {
+
+    // ── Logout button ─────────────────────────────────────
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", async function () {
+            if (!confirm("Are you sure you want to logout?"))
+                return;
+            try {
+                sessionStorage.removeItem("pjm_user");
+                await window.db.auth.signOut();
+            } catch (e) {
+                console.error("Logout error:", e.message);
+            } finally {
+                window.location.href = "login.html";
+            }
+        });
+    }
+
+    // ── Retry user bar in case guard finished late ────────
+    (function retryUserBar() {
+        if (!window.currentUser) {
+            setTimeout(retryUserBar, 150);
+            return;
+        }
+        const u = window.currentUser;
+        const nameEl   = document.getElementById("user-name");
+        const roleEl   = document.getElementById("user-role");
+        const avatarEl = document.getElementById("user-avatar");
+        if (nameEl)   nameEl.textContent   = u.name;
+        if (roleEl)   roleEl.textContent   = u.role;
+        if (avatarEl) avatarEl.textContent =
+            u.name.charAt(0).toUpperCase();
+    })();
+
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Admin Dashboard</title>
+    <script src="supabase.js"></script>
+    <script src="supabase-config.js"></script>
+    <link rel="stylesheet" href="admin.css">
+    <script>
+    "use strict";
+    var ALLOWED_ROLE = "sample coordinator";
+    (async function guardPage() {
+        console.log("🔍 GUARD: Started");
+        await new Promise(function (resolve, reject) {
+            if (window.db && typeof window.db.from === "function") {
+                resolve(); return;
+            }
+            let attempts = 0;
+            const interval = setInterval(function () {
+                attempts++;
+                if (window.db && typeof window.db.from === "function") {
+                    clearInterval(interval);
+                    resolve();
+                } else if (attempts >= 50) {
+                    clearInterval(interval);
+                    reject(new Error("DB timeout"));
+                }
+            }, 100);
+        }).catch(function () {
+            window.location.href = "login.html";
+            throw new Error("stop");
+        });
+        try {
+            const stored = sessionStorage.getItem("pjm_user");
+            if (stored) {
+                const cachedUser = JSON.parse(stored);
+                if (cachedUser && cachedUser.role === ALLOWED_ROLE) {
+                    window.currentUser = cachedUser;
+                    populateUserBar();
+                    return;
+                } else {
+                    sessionStorage.removeItem("pjm_user");
+                    window.location.href = "login.html";
+                    return;
+                }
+            }
+            const { data, error } = await Promise.race([
+                window.db.auth.getSession(),
+                new Promise(function (resolve) {
+                    setTimeout(function () {
+                        resolve({ data: { session: null }, error: null });
+                    }, 5000);
+                })
+            ]);
+            if (error || !data?.session) {
+                window.location.href = "login.html";
+                return;
+            }
+            const { data: user, error: userError } = await Promise.race([
+                window.db.from("users").select("role, is_active, name")
+                    .eq("id", data.session.user.id).single(),
+                new Promise(function (resolve) {
+                    setTimeout(function () {
+                        resolve({ data: null, error: { message: "timeout" } });
+                    }, 8000);
+                })
+            ]);
+            if (userError || !user) { window.location.href = "login.html"; return; }
+            if (!user.is_active) {
+                await window.db.auth.signOut();
+                window.location.href = "login.html"; return;
+            }
+            if (user.role !== ALLOWED_ROLE) {
+                window.location.href = "login.html"; return;
+            }
+            window.currentUser = {
+                id   : data.session.user.id,
+                email: data.session.user.email,
+                name : user.name || data.session.user.email.split("@")[0],
+                role : user.role
+            };
+            sessionStorage.setItem("pjm_user", JSON.stringify(window.currentUser));
+            populateUserBar();
+        } catch (err) {
+            console.error("GUARD Error:", err.message);
+            window.location.href = "login.html";
+        }
+    })();
+    function populateUserBar() {
+        if (!document.getElementById("user-name")) {
+            setTimeout(populateUserBar, 100); return;
+        }
+        const u = window.currentUser;
+        if (!u) return;
+        const nameEl   = document.getElementById("user-name");
+        const roleEl   = document.getElementById("user-role");
+        const avatarEl = document.getElementById("user-avatar");
+        if (nameEl)   nameEl.textContent   = u.name;
+        if (roleEl)   roleEl.textContent   = u.role;
+        if (avatarEl) avatarEl.textContent = u.name.charAt(0).toUpperCase();
+    }
+    </script>
+</head>
+<body>
+<!-- USER BAR -->
+<div class="user-bar" id="user-bar">
+    <div class="user-bar-left">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-info">
+            <div class="user-name" id="user-name">Loading...</div>
+            <div class="user-role" id="user-role"></div>
+        </div>
+    </div>
+    <button class="logout-btn" id="logout-btn">🔓 Logout</button>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="header-left">
+        <div class="header-logo">
+            <div class="logo-icon">&#9881;</div>
+            <div>
+                <div class="header-title">PJM Admin Dashboard</div>
+                <div class="header-subtitle">Weekly Limit Management</div>
+            </div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="header-stats">
+            <div class="stat-badge">
+                <span>Active Limits:</span>
+                <span class="stat-num" id="stat-active-limits">0</span>
+            </div>
+            <div class="stat-badge">
+                <span>This Week Usage:</span>
+                <span class="stat-num" id="stat-week-usage">0%</span>
+            </div>
+            <div class="stat-badge">
+                <span>Weeks Configured:</span>
+                <span class="stat-num" id="stat-weeks-configured">0</span>
+            </div>
+        </div>
+        <div class="current-date" id="current-date"></div>
+    </div>
+</header>
+
+<!-- NAV TABS -->
+<div class="page-nav">
+    <div class="page-nav-inner">
+        <a href="autoscheduler.html" class="page-nav-btn">
+            &#128197; Build Plan Scheduler
+        </a>
+        <button class="page-nav-btn active" id="nav-admin">
+            &#9881; Admin Dashboard
+        </button>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div class="admin-container">
+
+    <!-- ── SIDE PANEL ─────────────────────────────────── -->
+    <aside class="admin-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-icon">&#9881;</span>
+            <h2>Set Weekly Limits</h2>
+        </div>
+
+        <div class="form-scroll">
+            <form id="limit-form" novalidate>
+
+                <!-- Week Selector -->
+                <div class="section-divider">
+                    <span class="section-label">Target Week</span>
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="f-week-start">
+                        Week Start (Monday)
+                        <span class="field-required">*</span>
+                    </label>
+                    <input type="date"
+                           class="form-input"
+                           id="f-week-start"
+                           onchange="onWeekStartChange()">
+                    <div class="error-msg" id="err-week-start"></div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Week Range</label>
+                    <div class="week-range-display" id="week-range-display">
+                        — select a Monday —
+                    </div>
+                </div>
+
+                <!-- Apply-to options -->
+                <div class="field-group">
+                    <label class="field-label">Apply To</label>
+                    <div class="apply-options">
+                        <label class="radio-option">
+                            <input type="radio" name="apply-to"
+                                   value="single" checked
+                                   onchange="onApplyToChange()">
+                            <span>This week only</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="apply-to"
+                                   value="forward"
+                                   onchange="onApplyToChange()">
+                            <span>This week &amp; all future weeks</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Limits -->
+                <div class="section-divider">
+                    <span class="section-label">Weekly Limits</span>
+                </div>
+
+                <!-- Max Projects -->
+                <div class="field-group">
+                    <label class="field-label" for="f-max-projects">
+                        Max No. of Projects
+                        <span class="field-required">*</span>
+                    </label>
+                    <div class="limit-input-wrap">
+                        <input type="number"
+                               class="form-input"
+                               id="f-max-projects"
+                               placeholder="e.g., 10"
+                               min="1" max="9999">
+                        <span class="limit-unit">projects / week</span>
+                    </div>
+                    <div class="error-msg" id="err-max-projects"></div>
+                </div>
+
+                <!-- Max Quantity -->
+                <div class="field-group">
+                    <label class="field-label" for="f-max-quantity">
+                        Max Total Quantity
+                        <span class="field-required">*</span>
+                    </label>
+                    <div class="limit-input-wrap">
+                        <input type="number"
+                               class="form-input"
+                               id="f-max-quantity"
+                               placeholder="e.g., 5000"
+                               min="1" max="999999">
+                        <span class="limit-unit">units / week</span>
+                    </div>
+                    <div class="error-msg" id="err-max-quantity"></div>
+                </div>
+
+                <!-- Max No. of Lots -->
+                <div class="field-group">
+                    <label class="field-label" for="f-max-lots">
+                        Max No. of Lots
+                        <span class="field-required">*</span>
+                    </label>
+                    <div class="limit-input-wrap">
+                        <input type="number"
+                               class="form-input"
+                               id="f-max-lots"
+                               placeholder="e.g., 20"
+                               min="1" max="9999">
+                        <span class="limit-unit">lots / week</span>
+                    </div>
+                    <div class="error-msg" id="err-max-lots"></div>
+                </div>
+
+                <!-- Notes -->
+                <div class="field-group">
+                    <label class="field-label" for="f-limit-notes">
+                        Notes
+                        <span class="field-optional">(Optional)</span>
+                    </label>
+                    <textarea class="form-textarea"
+                              id="f-limit-notes"
+                              placeholder="Reason for this limit..."
+                              rows="3"></textarea>
+                </div>
+
+            </form>
+        </div><!-- /form-scroll -->
+
+        <div class="form-buttons">
+            <button class="btn btn-success"
+                    id="save-limit-btn"
+                    onclick="saveWeeklyLimit()">
+                &#128190; Save Limits
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="clearLimitForm()">
+                &#8635; Clear
+            </button>
+        </div>
+    </aside>
+
+    <!-- ── RIGHT PANEL ────────────────────────────────── -->
+    <div class="admin-right">
+
+        <!-- Inner tabs -->
+        <div class="tabs-header">
+            <button class="tab-btn active"
+                    id="tab-overview"
+                    onclick="switchAdminTab('overview')">
+                &#128202; Overview
+            </button>
+            <button class="tab-btn"
+                    id="tab-limits"
+                    onclick="switchAdminTab('limits')">
+                &#128203; Limits Table
+            </button>
+            <button class="tab-btn"
+                    id="tab-usage"
+                    onclick="switchAdminTab('usage')">
+                &#128200; Usage Analytics
+            </button>
+            <button class="tab-btn"
+            id="tab-equipment"
+            onclick="switchAdminTab('equipment')">
+                &#9881; Equipment
+    </button>
+    <button class="tab-btn"
+        id="tab-monthly"
+        onclick="switchAdminTab('monthly')">
+    &#128197; Monthly Summary
+</button>
+<button class="tab-btn"
+        id="tab-users"
+        onclick="switchAdminTab('users')">
+    &#128100; Manage Users
+</button>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+<!-- MONTHLY SUMMARY TAB                                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-content-monthly">
+
+    <div class="form-scroll">
+            <form id="project-form" novalidate>
+
+    <!-- Toolbar -->
+    <div class="list-toolbar">
+        <div class="list-toolbar-left">
+            <!-- Month picker -->
+            <div class="field-group" style="margin:0">
+                <label class="field-label" style="margin-bottom:4px">
+                    Select Month
+                </label>
+                <input type="month"
+                       class="form-input"
+                       id="monthly-picker"
+                       style="width:180px"
+                       onchange="loadMonthlySummary()">
+            </div>
+            <!-- Quick nav -->
+            <button type="button"
+            class="btn btn-ghost btn-sm"
+                    onclick="shiftMonth(-1)">
+                &#9664; Prev
+            </button>
+            <button type="button"
+            class="btn btn-ghost btn-sm"
+                    onclick="goToCurrentMonth()">
+                This Month
+            </button>
+            <button type="button"
+            class="btn btn-ghost btn-sm"
+                    onclick="shiftMonth(1)">
+                Next &#9654;
+            </button>
+        </div>
+        <div class="list-toolbar-right">
+            <button type="button"
+        class="btn btn-ghost btn-sm"
+        onclick="exportMonthlyCSV()">
+    &#128228; Export CSV
+</button>
+        </div>
+    </div>
+
+    <!-- Month title -->
+    <div class="monthly-title" id="monthly-title">
+        Loading...
+    </div>
+
+    <!-- Summary cards -->
+    <div class="monthly-cards" id="monthly-cards">
+        <div class="overview-card-skeleton"></div>
+        <div class="overview-card-skeleton"></div>
+        <div class="overview-card-skeleton"></div>
+        <div class="overview-card-skeleton"></div>
+    </div>
+
+    <!-- Weekly breakdown inside the month -->
+    <div class="overview-section-title" style="margin-top:24px">
+        &#128197; Weekly Breakdown
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="monthly-weekly-table">
+            <thead>
+                <tr>
+                    <th>Week</th>
+                    <th>Projects</th>
+                    <th>Total Quantity</th>
+                    <th>Total Lots</th>
+                    <th>Unique Equipment</th>
+                    <th>Unique UPD</th>
+                    <th>Limit Status</th>
+                </tr>
+            </thead>
+            <tbody id="monthly-weekly-tbody"></tbody>
+        </table>
+        <div class="empty-state hidden" id="monthly-weekly-empty">
+            <div class="empty-icon">&#128197;</div>
+            <div class="empty-title">No Projects This Month</div>
+            <div class="empty-desc">
+                No bookings found for the selected month
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-equipment breakdown -->
+    <div class="overview-section-title" style="margin-top:28px">
+        &#9881; Equipment Usage This Month
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="monthly-equipment-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Equipment</th>
+                    <th>Projects</th>
+                    <th>Total Quantity</th>
+                    <th>Total Lots</th>
+                    <th>Usage Bar</th>
+                </tr>
+            </thead>
+            <tbody id="monthly-equipment-tbody"></tbody>
+        </table>
+        <div class="empty-state hidden"
+             id="monthly-equipment-empty">
+            <div class="empty-icon">&#9881;</div>
+            <div class="empty-title">No Equipment Data</div>
+            <div class="empty-desc">
+                No equipment usage found for this month
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-PJM breakdown -->
+    <div class="overview-section-title" style="margin-top:28px">
+        &#128100; PJM Activity This Month
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="monthly-pjm-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>PJM Name</th>
+                    <th>Projects</th>
+                    <th>Total Quantity</th>
+                    <th>Total Lots</th>
+                    <th>Platforms</th>
+                </tr>
+            </thead>
+            <tbody id="monthly-pjm-tbody"></tbody>
+        </table>
+        <div class="empty-state hidden" id="monthly-pjm-empty">
+            <div class="empty-icon">&#128100;</div>
+            <div class="empty-title">No PJM Data</div>
+            <div class="empty-desc">
+                No PJM activity found for this month
+            </div>
+        </div>
+    </div>
+
+</div><!-- /tab-content-monthly -->
+</form>
+        </div><!-- /form-scroll -->
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- OVERVIEW TAB                                -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div class="tab-content active" id="tab-content-overview">
+
+            <!-- Current week summary -->
+            <div class="overview-section-title">
+                &#128197; Current Week at a Glance
+            </div>
+            <div class="overview-cards" id="overview-cards">
+                <!-- filled by JS -->
+                <div class="overview-card-skeleton"></div>
+                <div class="overview-card-skeleton"></div>
+                <div class="overview-card-skeleton"></div>
+            </div>
+
+            <!-- Recent limit changes -->
+            <div class="overview-section-title" style="margin-top:28px">
+                &#128221; Recent Limit Changes
+            </div>
+            <div class="recent-changes-wrap">
+                <table class="data-table" id="recent-changes-table">
+                    <thead>
+                        <tr>
+                            <th>Week</th>
+                            <th>Max Projects</th>
+                            <th>Max Quantity</th>
+                            <th>Max Lots</th>
+                            <th>Set By</th>
+                            <th>Date Set</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-changes-tbody"></tbody>
+                </table>
+                <div class="empty-state hidden" id="recent-empty">
+                    <div class="empty-icon">&#128202;</div>
+                    <div class="empty-title">No limits configured yet</div>
+                    <div class="empty-desc">
+                        Use the form on the left to set your first weekly limit
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- LIMITS TABLE TAB                            -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div class="tab-content" id="tab-content-limits">
+            <div class="list-toolbar">
+                <div class="list-toolbar-left">
+                    <div class="search-box">
+                        <span class="search-icon">&#128269;</span>
+                        <input type="text"
+                               id="limit-search"
+                               placeholder="Search weeks..."
+                               oninput="filterLimits()">
+                    </div>
+                    <select class="filter-select"
+                            id="filter-limit-status"
+                            onchange="filterLimits()">
+                        <option value="">All Weeks</option>
+                        <option value="current">Current Week</option>
+                        <option value="past">Past Weeks</option>
+                        <option value="future">Future Weeks</option>
+                    </select>
+                </div>
+                <div class="list-toolbar-right">
+                    <button class="btn btn-ghost btn-sm"
+                            onclick="exportLimitsCSV()">
+                        &#128228; Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="limits-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th onclick="sortLimits('week')"
+                                class="sortable">Week Start</th>
+                            <th onclick="sortLimits('week')"
+                                class="sortable">Week End</th>
+                            <th onclick="sortLimits('projects')"
+                                class="sortable">Max Projects</th>
+                            <th onclick="sortLimits('quantity')"
+                                class="sortable">Max Quantity</th>
+                            <th onclick="sortLimits('lots')"
+                                class="sortable">Max Lots</th>
+                            <th>Usage</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="limits-tbody"></tbody>
+                </table>
+                <div class="empty-state hidden" id="limits-empty">
+                    <div class="empty-icon">&#128203;</div>
+                    <div class="empty-title">No Weekly Limits Set</div>
+                    <div class="empty-desc">
+                        Configure limits using the form on the left
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- USAGE ANALYTICS TAB                         -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div class="tab-content" id="tab-content-usage">
+            <div class="analytics-toolbar">
+                <label class="field-label" style="margin:0">
+                    View Range:
+                </label>
+                <select class="filter-select"
+                        id="analytics-range"
+                        onchange="loadAnalytics()">
+                    <option value="4">Last 4 Weeks</option>
+                    <option value="8" selected>Last 8 Weeks</option>
+                    <option value="12">Last 12 Weeks</option>
+                    <option value="26">Last 26 Weeks</option>
+                </select>
+            </div>
+
+            <!-- Bar charts -->
+            <div class="analytics-grid" id="analytics-grid">
+                <!-- Projects chart -->
+                <div class="analytics-card">
+                    <div class="analytics-card-title">
+                        &#128203; Projects per Week
+                    </div>
+                    <div class="chart-area" id="chart-projects"></div>
+                </div>
+                <!-- Quantity chart -->
+                <div class="analytics-card">
+                    <div class="analytics-card-title">
+                        &#128230; Quantity per Week
+                    </div>
+                    <div class="chart-area" id="chart-quantity"></div>
+                </div>
+                <!-- Lots chart -->
+                <div class="analytics-card">
+                    <div class="analytics-card-title">
+                        &#128218; Lots per Week
+                    </div>
+                    <div class="chart-area" id="chart-lots"></div>
+                </div>
+            </div>
+
+            <div class="empty-state hidden" id="analytics-empty">
+                <div class="empty-icon">&#128200;</div>
+                <div class="empty-title">No Data Available</div>
+                <div class="empty-desc">
+                    Analytics will appear once projects are scheduled
+                </div>
+            </div>
+        </div>
+        <!-- ═══════════════════════════════════════════════════════ -->
+<!-- EQUIPMENT TAB                                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-content-equipment">
+
+    <!-- Toolbar -->
+    <div class="list-toolbar">
+        <div class="list-toolbar-left">
+            <div class="search-box">
+                <span class="search-icon">&#128269;</span>
+                <input type="text"
+                       id="equipment-search"
+                       placeholder="Search name or group..."
+                       oninput="filterEquipment()">
+            </div>
+            <select class="filter-select"
+                    id="filter-equipment-group"
+                    onchange="filterEquipment()">
+                <option value="">All Groups</option>
+            </select>
+        </div>
+        <div class="list-toolbar-right">
+            <span class="selected-count"
+                  id="equipment-selected-count">
+            </span>
+            <button class="btn btn-danger btn-sm"
+                    id="eq-bulk-delete-btn"
+                    style="display:none"
+                    onclick="openBulkDeleteEquipmentModal()">
+                &#128465; Delete Selected
+            </button>
+            <button class="btn btn-primary btn-sm"
+                    onclick="openEquipmentModal('add')">
+                &#43; Add Equipment
+            </button>
+            <button class="btn btn-ghost btn-sm"
+                    onclick="exportEquipmentCSV()">
+                &#128228; Export CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats pills -->
+    <div class="equipment-stats-row">
+        <div class="eq-stat-pill">
+            <span class="eq-stat-dot"
+                  style="background:var(--accent)">
+            </span>
+            Total Equipment:
+            <strong id="eq-stat-total">0</strong>
+        </div>
+        <div class="eq-stat-pill">
+            <span class="eq-stat-dot"
+                  style="background:var(--accent2)">
+            </span>
+            Groups:
+            <strong id="eq-stat-groups">0</strong>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table class="data-table" id="equipment-table">
+            <thead>
+            <tr>
+                <th class="checkbox-cell">
+                <input type="checkbox"
+                   id="eq-select-all"
+                   onchange="toggleSelectAllEquipment()">
+            </th>
+        <th style="width:50px">#</th>
+        <th onclick="sortEquipment('group')"
+            class="sortable"
+            id="eq-th-group">
+            Group ↕
+        </th>
+        <th onclick="sortEquipment('name')"
+            class="sortable"
+            id="eq-th-name">
+            Equipment Name ↕
+        </th>
+        <th style="width:100px">Actions</th>
+    </tr>
+</thead>
+            <tbody id="equipment-tbody"></tbody>
+        </table>
+
+        <!-- Empty state -->
+        <div class="empty-state hidden"
+             id="equipment-empty">
+            <div class="empty-icon">&#9881;</div>
+            <div class="empty-title">No Equipment Found</div>
+            <div class="empty-desc">
+                Click <strong>+ Add Equipment</strong>
+                to add your first equipment
+            </div>
+        </div>
+    </div>
+
+</div><!-- /tab-content-equipment -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MANAGE USERS TAB                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-content-users">
+
+    <!-- ── Toolbar ── -->
+    <div class="list-toolbar">
+        <div class="list-toolbar-left">
+            <div class="search-box">
+                <span class="search-icon">&#128269;</span>
+                <input type="text"
+                       id="user-search"
+                       placeholder="Search name or email..."
+                       oninput="filterUsers()">
+            </div>
+            <select class="filter-select"
+                    id="filter-user-role"
+                    onchange="filterUsers()">
+                <option value="">All Roles</option>
+                <option value="pjm">PJM</option>
+                <option value="sample coordinator">
+                    Sample Coordinator
+                </option>
+            </select>
+            <select class="filter-select"
+                    id="filter-user-status"
+                    onchange="filterUsers()">
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+        <div class="list-toolbar-right">
+            <button class="btn btn-primary btn-sm"
+                    onclick="openRegisterModal()">
+                &#43; Register New User
+            </button>
+            <button class="btn btn-ghost btn-sm"
+                    onclick="exportUsersCSV()">
+                &#128228; Export CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Stats pills ── -->
+    <div class="equipment-stats-row">
+        <div class="eq-stat-pill">
+            <span class="eq-stat-dot"
+                  style="background:var(--accent)"></span>
+            Total Users:
+            <strong id="user-stat-total">0</strong>
+        </div>
+        <div class="eq-stat-pill">
+            <span class="eq-stat-dot"
+                  style="background:#6366f1"></span>
+            PJM:
+            <strong id="user-stat-pjm">0</strong>
+        </div>
+        <div class="eq-stat-pill">
+            <span class="eq-stat-dot"
+                  style="background:#14b8a6"></span>
+            Coordinators:
+            <strong id="user-stat-coord">0</strong>
+        </div>
+        <div class="eq-stat-pill">
+            <span class="eq-stat-dot"
+                  style="background:#22c55e"></span>
+            Active:
+            <strong id="user-stat-active">0</strong>
+        </div>
+    </div>
+
+    <!-- ── Users Table ── -->
+    <div class="table-container">
+        <table class="data-table" id="users-table">
+            <thead>
+                <tr>
+                    <th style="width:40px">#</th>
+                    <th onclick="sortUsers('name')"
+                        class="sortable">Name</th>
+                    <th onclick="sortUsers('email')"
+                        class="sortable">Email</th>
+                    <th onclick="sortUsers('role')"
+                        class="sortable">Role</th>
+                    <th onclick="sortUsers('status')"
+                        class="sortable">Status</th>
+                    <th onclick="sortUsers('created')"
+                        class="sortable">Created</th>
+                    <th style="width:140px">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+        </table>
+        <div class="empty-state hidden" id="users-empty">
+            <div class="empty-icon">&#128100;</div>
+            <div class="empty-title">No Users Found</div>
+            <div class="empty-desc">
+                Click <strong>+ Register New User</strong>
+                to add the first user
+            </div>
+        </div>
+    </div>
+
+</div><!-- /tab-content-users -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- EDIT LIMIT MODAL                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="edit-limit-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div>
+                <div class="modal-title">&#9998; Edit Weekly Limit</div>
+                <div class="modal-subtitle" id="edit-modal-subtitle"></div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal('edit-limit-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="field-group">
+                <label class="field-label">Max Projects</label>
+                <input type="number" class="form-input"
+                       id="edit-max-projects" min="1">
+            </div>
+            <div class="field-group">
+                <label class="field-label">Max Quantity</label>
+                <input type="number" class="form-input"
+                       id="edit-max-quantity" min="1">
+            </div>
+            <div class="field-group">
+                <label class="field-label">Max Lots</label>
+                <input type="number" class="form-input"
+                       id="edit-max-lots" min="1">
+            </div>
+            <div class="field-group">
+                <label class="field-label">Notes</label>
+                <textarea class="form-textarea"
+                          id="edit-limit-notes" rows="3"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-success"
+                    onclick="confirmEditLimit()">
+                &#128190; Save Changes
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal('edit-limit-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delete-limit-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header danger-header">
+            <div>
+                <div class="modal-title">&#128465; Delete Limit</div>
+                <div class="modal-subtitle" id="delete-modal-subtitle"></div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal('delete-limit-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-confirm-text">
+                Are you sure you want to delete the weekly limit for
+                <strong id="delete-week-label"></strong>?
+                This action cannot be undone.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger"
+                    onclick="confirmDeleteLimit()">
+                &#128465; Yes, Delete
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal('delete-limit-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- ADD / EDIT EQUIPMENT MODAL                              -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="equipment-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <div>
+                <div class="modal-title"
+                     id="eq-modal-title">
+                    &#43; Add Equipment
+                </div>
+                <div class="modal-subtitle"
+                     id="eq-modal-subtitle">
+                    Fill in the details below
+                </div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal('equipment-modal')">
+                &#10005;
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <!-- Group -->
+            <div class="field-group">
+                <label class="field-label" for="eq-group">
+                    Group
+                    <span class="field-required">*</span>
+                </label>
+                <input type="text"
+                       class="form-input"
+                       id="eq-group"
+                       placeholder="e.g., SMT, Assembly, Testing"
+                       list="eq-group-datalist"
+                       autocomplete="off">
+                <!-- suggests existing groups -->
+                <datalist id="eq-group-datalist"></datalist>
+                <div class="error-msg" id="err-eq-group"></div>
+            </div>
+
+            <!-- Name -->
+            <div class="field-group">
+                <label class="field-label" for="eq-name">
+                    Equipment Name
+                    <span class="field-required">*</span>
+                </label>
+                <input type="text"
+                       class="form-input"
+                       id="eq-name"
+                       placeholder="e.g., SMT Machine A"
+                       autocomplete="off">
+                <div class="error-msg" id="err-eq-name"></div>
+            </div>
+
+        </div><!-- /modal-body -->
+
+        <div class="modal-footer">
+            <button class="btn btn-success"
+                    id="eq-save-btn"
+                    onclick="confirmSaveEquipment()">
+                &#128190; Save Equipment
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal('equipment-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- DELETE SINGLE EQUIPMENT MODAL                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="delete-equipment-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header danger-header">
+            <div>
+                <div class="modal-title">
+                    &#128465; Delete Equipment
+                </div>
+                <div class="modal-subtitle"
+                     id="delete-eq-subtitle">
+                </div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal(
+                             'delete-equipment-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-confirm-text">
+                Are you sure you want to delete
+                <strong id="delete-eq-name-label"></strong>?
+                <br><br>
+                This action cannot be undone.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger"
+                    id="confirm-delete-eq-btn"
+                    onclick="confirmDeleteEquipment()">
+                &#128465; Yes, Delete
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal(
+                             'delete-equipment-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- BULK DELETE EQUIPMENT MODAL                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="bulk-delete-equipment-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header danger-header">
+            <div>
+                <div class="modal-title">
+                    &#128465; Delete Selected Equipment
+                </div>
+                <div class="modal-subtitle"
+                     id="bulk-delete-eq-subtitle">
+                </div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal(
+                             'bulk-delete-equipment-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-confirm-text"
+               id="bulk-delete-eq-text">
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger"
+                    id="confirm-bulk-delete-eq-btn"
+                    onclick="confirmBulkDeleteEquipment()">
+                &#128465; Yes, Delete All
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal(
+                             'bulk-delete-equipment-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- REGISTER USER MODAL                                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="register-user-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div>
+                <div class="modal-title"
+                     id="reg-modal-title">
+                    &#43; Register New User
+                </div>
+                <div class="modal-subtitle">
+                    New user will use the default password
+                    and must reset it after first login
+                </div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal('register-user-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+
+            <!-- Alerts -->
+            <div class="alert alert-error"
+                 id="reg-error"
+                 style="display:none; margin-bottom:14px;
+                        padding:10px 14px; border-radius:6px;
+                        background:rgba(239,68,68,.1);
+                        border:1px solid rgba(239,68,68,.3);
+                        color:#fca5a5; font-size:12px;">
+                <span id="reg-error-msg"></span>
+            </div>
+
+            <!-- Full Name -->
+            <div class="field-group">
+                <label class="field-label">
+                    Full Name
+                    <span class="field-required">*</span>
+                </label>
+                <input type="text"
+                       class="form-input"
+                       id="reg-name"
+                       placeholder="e.g. Ahmad bin Ali"
+                       autocomplete="off">
+                <div class="error-msg" id="err-reg-name"></div>
+            </div>
+
+            <!-- Email -->
+            <div class="field-group">
+                <label class="field-label">
+                    Company Email
+                    <span class="field-required">*</span>
+                </label>
+                <input type="email"
+                       class="form-input"
+                       id="reg-email"
+                       placeholder="yourname@company.com"
+                       autocomplete="off">
+                <div class="error-msg" id="err-reg-email"></div>
+            </div>
+
+            <!-- Role -->
+            <div class="field-group">
+                <label class="field-label">
+                    Role
+                    <span class="field-required">*</span>
+                </label>
+                <select class="form-select" id="reg-role">
+                    <option value="">— Select Role —</option>
+                    <option value="pjm">PJM</option>
+                    <option value="sample coordinator">
+                        Sample Coordinator
+                    </option>
+                </select>
+                <div class="error-msg" id="err-reg-role"></div>
+            </div>
+
+            <!-- Default password notice -->
+            <div style="
+                display       : flex;
+                align-items   : flex-start;
+                gap           : 10px;
+                background    : rgba(59,130,246,.08);
+                border        : 1px solid rgba(59,130,246,.2);
+                border-radius : 6px;
+                padding       : 12px 14px;
+                margin-bottom : 14px;
+                font-size     : 12px;
+                color         : #93c5fd;
+                line-height   : 1.6;
+            ">
+                <span style="font-size:16px; flex-shrink:0;">ℹ️</span>
+                <div>
+                    Default password:
+                    <strong style="
+                        font-family    : monospace;
+                        background     : rgba(255,255,255,.08);
+                        padding        : 2px 8px;
+                        border-radius  : 4px;
+                        color          : #e2e8f0;
+                        letter-spacing : 1px;
+                    ">Pjm@12345</strong>
+                    <br>
+                    <span style="color:#64748b; font-size:11px;">
+                        User must reset password after first login
+                        via Forgot Password.
+                    </span>
+                </div>
+            </div>
+
+            <!-- Confirm default password -->
+            <div class="field-group">
+                <label class="field-label">
+                    Confirm Default Password
+                    <span class="field-required">*</span>
+                </label>
+                <div style="position:relative;">
+                    <input type="password"
+                           class="form-input"
+                           id="reg-confirm-pw"
+                           placeholder="Re-type default password"
+                           style="padding-right:44px;"
+                           autocomplete="new-password">
+                    <button type="button"
+                            onclick="toggleRegPw()"
+                            id="reg-pw-toggle"
+                            style="
+                                position   : absolute;
+                                right      : 12px;
+                                top        : 50%;
+                                transform  : translateY(-50%);
+                                background : none;
+                                border     : none;
+                                cursor     : pointer;
+                                font-size  : 14px;
+                                color      : #64748b;
+                                padding    : 4px;
+                            ">👁️</button>
+                </div>
+                <div class="error-msg" id="err-reg-pw"></div>
+            </div>
+
+        </div><!-- /modal-body -->
+        <div class="modal-footer">
+            <button class="btn btn-success"
+                    id="reg-save-btn"
+                    onclick="confirmRegisterUser()">
+                <span id="reg-save-label">&#43; Register User</span>
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal('register-user-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- EDIT USER MODAL                                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="edit-user-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <div>
+                <div class="modal-title">&#9998; Edit User</div>
+                <div class="modal-subtitle"
+                     id="edit-user-subtitle"></div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal('edit-user-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="field-group">
+                <label class="field-label">Full Name</label>
+                <input type="text"
+                       class="form-input"
+                       id="edit-user-name"
+                       placeholder="Full name">
+                <div class="error-msg"
+                     id="err-edit-user-name"></div>
+            </div>
+            <div class="field-group">
+                <label class="field-label">Role</label>
+                <select class="form-select" id="edit-user-role">
+                    <option value="pjm">PJM</option>
+                    <option value="sample coordinator">
+                        Sample Coordinator
+                    </option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label class="field-label">Status</label>
+                <select class="form-select" id="edit-user-status">
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-success"
+                    onclick="confirmEditUser()">
+                &#128190; Save Changes
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal('edit-user-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- DELETE USER MODAL                                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="delete-user-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header danger-header">
+            <div>
+                <div class="modal-title">
+                    &#128465; Delete User
+                </div>
+                <div class="modal-subtitle"
+                     id="delete-user-subtitle"></div>
+            </div>
+            <button class="modal-close"
+                    onclick="closeAdminModal('delete-user-modal')">
+                &#10005;
+            </button>
+        </div>
+        <div class="modal-body">
+            <p class="delete-confirm-text">
+                Are you sure you want to delete
+                <strong id="delete-user-name-label"></strong>?
+                <br><br>
+                This will permanently remove their account
+                and cannot be undone.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger"
+                    onclick="confirmDeleteUser()">
+                &#128465; Yes, Delete
+            </button>
+            <button class="btn btn-ghost"
+                    onclick="closeAdminModal('delete-user-modal')">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+<!-- TOAST -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- SCRIPTS -->
+<script src="admin.js"></script>
+
+<script>
+"use strict";
+document.addEventListener("DOMContentLoaded", function () {
+    // Logout
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", async function () {
+            if (!confirm("Are you sure you want to logout?")) return;
+            try {
+                sessionStorage.removeItem("pjm_user");
+                await window.db.auth.signOut();
+            } catch (e) {
+                console.error("Logout error:", e.message);
+            } finally {
+                window.location.href = "login.html";
+            }
+        });
+    }
+    // Retry user bar
+    (function retryUserBar() {
+        if (!window.currentUser) { setTimeout(retryUserBar, 150); return; }
+        const u = window.currentUser;
+        ["user-name","user-role","user-avatar"].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (id === "user-avatar") el.textContent = u.name.charAt(0).toUpperCase();
+            else if (id === "user-name") el.textContent = u.name;
+            else el.textContent = u.role;
+        });
+    })();
+});
+</script>
+
+</body>
+</html>

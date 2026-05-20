@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Build Plan — Login</title>
+    <link rel="stylesheet" href="login-style.css">
+</head>
+<body>
+    <div class="login-bg">
+        <div class="login-card">
+            <!-- Logo -->
+            <div class="login-logo">
+                <div class="login-logo-icon">&#9881;</div>
+                <div class="login-logo-text">
+                    <div class="login-title">PJM Build Plan</div>
+                    <div class="login-subtitle">Project Management System</div>
+                </div>
+            </div>
+            <!-- Role Selector -->
+            <div class="role-selector">
+                <button class="role-btn active" data-role="pjm">
+                    <span>👤</span>
+                    <span>PJM</span>
+                </button>
+                <button class="role-btn" data-role="sample coordinator">
+                    <span>👔</span>
+                    <span>Sample Coordinator</span>
+                </button>
+            </div>
+            <!-- Company Badge -->
+            <div class="company-badge">
+                <span class="company-icon">&#127970;</span>
+                <span class="company-name">Employee Portal</span>
+            </div>
+            <!-- Alert Box -->
+            <div class="alert-box hidden" id="alert-box">
+                <span class="alert-icon" id="alert-icon"></span>
+                <span id="alert-message"></span>
+            </div>
+            <!-- Login Form -->
+            <form id="login-form" novalidate>
+                <div class="input-group">
+                    <label class="input-label">Company Email</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">&#9993;</span>
+                        <input
+                            type="email"
+                            id="login-email"
+                            class="login-input"
+                            placeholder="yourname@infineon.com"
+                            autocomplete="email"
+                            required>
+                    </div>
+                    <div class="field-error hidden" id="err-email"></div>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">&#128274;</span>
+                        <input
+                            type="password"
+                            id="login-password"
+                            class="login-input"
+                            placeholder="Enter your password"
+                            autocomplete="current-password"
+                            required>
+                        <button
+                            type="button"
+                            class="toggle-password"
+                            id="toggle-pw-btn"
+                            title="Show/hide password">
+                            &#128065;
+                        </button>
+                    </div>
+                    <div class="field-error hidden" id="err-password"></div>
+                </div>
+                <div class="login-options">
+                    <label class="remember-label">
+                        <input type="checkbox" id="remember-me">
+                        <span>Remember me</span>
+                    </label>
+                    <button type="button" class="forgot-link" id="forgot-link-btn">
+                        Forgot password?
+                    </button>
+                </div>
+                <button type="submit" class="login-btn" id="login-btn">
+                    <span id="login-btn-text" class="btn-text">Sign In</span>
+                    <span id="login-btn-spinner" class="spinner hidden"></span>
+                </button>
+            </form>
+            <!-- Divider -->
+            <div class="divider"><span>or</span></div>
+            <!-- SSO Button -->
+            <button class="sso-btn" id="sso-btn">
+                <span class="sso-icon">&#127970;</span>
+                Sign in with Company SSO
+            </button>
+            <!-- Footer -->
+            <div class="login-footer">
+                <span>&#128274; Secure Company Access Only</span>
+                <span>&#183;</span>
+                <span>Unauthorized access is prohibited</span>
+            </div>
+        </div>
+        <div class="version-tag">PJM Build Plan v1.0</div>
+    </div>
+    <!-- Forgot Password Modal -->
+    <div class="modal-overlay hidden" id="forgot-modal">
+        <div class="forgot-card">
+            <div class="forgot-header">
+                <div class="forgot-title">&#128274; Reset Password</div>
+                <button class="modal-close" id="modal-close-btn">&#10005;</button>
+            </div>
+            <p class="forgot-desc">
+                Enter your company email address and we'll send
+                you a password reset link.
+            </p>
+            <div class="input-group">
+                <label class="input-label">Company Email</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">&#9993;</span>
+                    <input
+                        type="email"
+                        id="forgot-email"
+                        class="login-input"
+                        placeholder="yourname@infineon.com">
+                </div>
+                <div class="field-error hidden" id="err-forgot-email"></div>
+            </div>
+            <div class="forgot-buttons">
+                <button class="btn-cancel" id="btn-cancel">Cancel</button>
+                <button class="btn-send" id="btn-send">&#128140; Send Reset Link</button>
+            </div>
+        </div>
+    </div>
+        <!-- ======================================================
+         SCRIPTS — must be in this exact order
+         ====================================================== -->
+
+    <!-- 1. Supabase library — always first -->
+    <script src="supabase.js"></script>
+
+    <!-- TEMP DIAGNOSIS SCRIPT — remove after fix -->
+    <script>
+        console.log("=== DIAGNOSIS ===");
+        console.log("1. supabase.js loaded?", typeof window.supabase);
+        console.log("2. createClient exists?", typeof window.supabase?.createClient);
+    </script>
+
+    <!-- 2. Creates window.db -->
+    <script src="supabase-config.js"></script>
+
+    <!-- TEMP DIAGNOSIS SCRIPT 2 — remove after fix -->
+    <script>
+        console.log("3. window.db after config?", typeof window.db, window.db);
+        console.log("4. window.db.from?", typeof window.db?.from);
+    </script>
+
+    <!-- 3. Login logic — must be last -->
+    <script src="auth.js"></script>
+
+</body>
+</html>

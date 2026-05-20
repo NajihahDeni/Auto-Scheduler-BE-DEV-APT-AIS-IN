@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register New User — PJM Build Plan</title>
+    <script src="supabase.js"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        * {
+            margin     : 0;
+            padding    : 0;
+            box-sizing : border-box;
+        }
+
+        body {
+            min-height      : 100vh;
+            display         : flex;
+            align-items     : center;
+            justify-content : center;
+            background      : #c8d0db;
+            font-family     : 'Segoe UI', system-ui, -apple-system, sans-serif;
+            padding         : 20px;
+        }
+
+        .version-tag {
+            position       : fixed;
+            bottom         : 16px;
+            right          : 20px;
+            font-size      : 11px;
+            color          : #8899aa;
+            letter-spacing : .3px;
+        }
+
+        /* ── Card ── */
+        .card {
+            background    : #1a2332;
+            border-radius : 12px;
+            box-shadow    : 0 20px 60px rgba(0,0,0,.4);
+            padding       : 36px 40px 28px;
+            width         : 100%;
+            max-width     : 480px;
+        }
+
+        /* ── Logo row ── */
+        .logo-row {
+            display      : flex;
+            align-items  : center;
+            gap          : 14px;
+            margin-bottom: 6px;
+        }
+
+        .logo-icon-box {
+            width           : 44px;
+            height          : 44px;
+            background      : #2a3f5f;
+            border-radius   : 8px;
+            display         : flex;
+            align-items     : center;
+            justify-content : center;
+            font-size       : 20px;
+            flex-shrink     : 0;
+        }
+
+        .logo-title {
+            font-size      : 18px;
+            font-weight    : 800;
+            color          : #e8edf5;
+            letter-spacing : 1.5px;
+            text-transform : uppercase;
+        }
+
+        .logo-sub {
+            font-size      : 10px;
+            color          : #7a8fa8;
+            letter-spacing : 2px;
+            text-transform : uppercase;
+            margin-top     : 2px;
+        }
+
+        /* ── Divider ── */
+        .divider {
+            border     : none;
+            border-top : 1px solid #2a3a50;
+            margin     : 18px 0 24px;
+        }
+
+        /* ── Info banner ── */
+        .info-banner {
+            display       : flex;
+            align-items   : center;
+            gap           : 10px;
+            background    : #1e2d42;
+            border-left   : 3px solid #3d6494;
+            border-radius : 6px;
+            padding       : 12px 14px;
+            margin-bottom : 24px;
+            font-size     : 13px;
+            color         : #a0b4cc;
+        }
+
+        /* ── Section label ── */
+        .section-label {
+            font-size      : 10px;
+            font-weight    : 700;
+            color          : #3d8ef0;
+            letter-spacing : 1.5px;
+            text-transform : uppercase;
+            margin-bottom  : 14px;
+            display        : flex;
+            align-items    : center;
+            gap            : 8px;
+        }
+
+        .section-label::after {
+            content    : '';
+            flex       : 1;
+            height     : 1px;
+            background : #2a3a50;
+        }
+
+        /* ── Field ── */
+        .field-group {
+            margin-bottom : 16px;
+        }
+
+        .field-label {
+            display        : block;
+            font-size      : 10px;
+            font-weight    : 700;
+            color          : #7a8fa8;
+            letter-spacing : 1.5px;
+            text-transform : uppercase;
+            margin-bottom  : 7px;
+        }
+
+        .field-required {
+            color      : #e74c3c;
+            margin-left: 2px;
+        }
+
+        .input-wrap {
+            position : relative;
+        }
+
+        .input-icon {
+            position       : absolute;
+            left           : 14px;
+            top            : 50%;
+            transform      : translateY(-50%);
+            font-size      : 14px;
+            pointer-events : none;
+        }
+
+        .field-input,
+        .field-select {
+            width         : 100%;
+            padding       : 12px 14px 12px 40px;
+            background    : #1e2d42;
+            border        : 1px solid #2a3a54;
+            border-radius : 6px;
+            font-size     : 13px;
+            color         : #c8d8e8;
+            outline       : none;
+            transition    : border-color .2s, box-shadow .2s;
+            appearance    : none;
+        }
+
+        .field-input::placeholder { color: #4a6080; }
+
+        .field-input:focus,
+        .field-select:focus {
+            border-color : #3d6494;
+            box-shadow   : 0 0 0 3px rgba(61,100,148,.2);
+        }
+
+        .field-input.error,
+        .field-select.error {
+            border-color : #c0392b;
+            box-shadow   : 0 0 0 3px rgba(192,57,43,.15);
+        }
+
+        .field-input.success {
+            border-color : #27ae60;
+            box-shadow   : 0 0 0 3px rgba(39,174,96,.15);
+        }
+
+        /* ── Select chevron ── */
+        .select-wrap {
+            position : relative;
+        }
+
+        .select-chevron {
+            position       : absolute;
+            right          : 14px;
+            top            : 50%;
+            transform      : translateY(-50%);
+            font-size      : 11px;
+            color          : #4a6080;
+            pointer-events : none;
+        }
+
+        .field-select option {
+            background : #1e2d42;
+            color      : #c8d8e8;
+        }
+
+        /* ── Password wrap ── */
+        .password-wrap .field-input {
+            padding-right : 44px;
+        }
+
+        .toggle-pw {
+            position    : absolute;
+            right       : 12px;
+            top         : 50%;
+            transform   : translateY(-50%);
+            background  : none;
+            border      : none;
+            cursor      : pointer;
+            font-size   : 14px;
+            color       : #4a6080;
+            padding     : 4px;
+            transition  : color .2s;
+        }
+
+        .toggle-pw:hover { color: #a0b4cc; }
+
+        /* ── Default password notice ── */
+        .default-pw-notice {
+            display       : flex;
+            align-items   : flex-start;
+            gap           : 10px;
+            background    : rgba(52,152,219,.1);
+            border        : 1px solid rgba(52,152,219,.25);
+            border-radius : 6px;
+            padding       : 12px 14px;
+            margin-top    : 8px;
+            font-size     : 12px;
+            color         : #85c1e9;
+            line-height   : 1.5;
+        }
+
+        .default-pw-notice strong {
+            color          : #e8edf5;
+            letter-spacing : .5px;
+            font-family    : monospace;
+            font-size      : 13px;
+            background     : #2a3a54;
+            padding        : 2px 8px;
+            border-radius  : 4px;
+        }
+
+        /* ── Field error ── */
+        .field-error {
+            font-size    : 11px;
+            color        : #e74c3c;
+            margin-top   : 5px;
+            display      : none;
+            padding-left : 2px;
+        }
+        .field-error.show { display: block; }
+
+        /* ── Alert boxes ── */
+        .alert {
+            display       : none;
+            align-items   : flex-start;
+            gap           : 10px;
+            padding       : 12px 14px;
+            border-radius : 6px;
+            font-size     : 12px;
+            margin-bottom : 16px;
+            line-height   : 1.5;
+        }
+        .alert.show    { display: flex; }
+        .alert-icon    { font-size: 15px; flex-shrink: 0; }
+
+        .alert-error {
+            background : rgba(192,57,43,.15);
+            border     : 1px solid rgba(192,57,43,.3);
+            color      : #e88;
+        }
+
+        .alert-success {
+            background : rgba(39,174,96,.12);
+            border     : 1px solid rgba(39,174,96,.3);
+            color      : #7dcea0;
+        }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            width           : 100%;
+            padding         : 14px;
+            background      : #2d5a9e;
+            color           : #e8edf5;
+            border          : none;
+            border-radius   : 6px;
+            font-size       : 12px;
+            font-weight     : 700;
+            letter-spacing  : 2px;
+            text-transform  : uppercase;
+            cursor          : pointer;
+            transition      : background .2s, transform .1s;
+            display         : flex;
+            align-items     : center;
+            justify-content : center;
+            gap             : 8px;
+            margin-bottom   : 10px;
+        }
+
+        .btn-primary:hover:not(:disabled) { background: #3568b0; }
+        .btn-primary:active:not(:disabled){ transform : scale(.99); }
+        .btn-primary:disabled {
+            opacity: .55;
+            cursor : not-allowed;
+        }
+
+        .btn-ghost {
+            width           : 100%;
+            padding         : 12px;
+            background      : transparent;
+            color           : #a0b4cc;
+            border          : 1px solid #2a3a54;
+            border-radius   : 6px;
+            font-size       : 12px;
+            font-weight     : 600;
+            letter-spacing  : 1px;
+            cursor          : pointer;
+            transition      : background .2s, border-color .2s;
+            display         : flex;
+            align-items     : center;
+            justify-content : center;
+            gap             : 8px;
+        }
+
+        .btn-ghost:hover {
+            background   : #243347;
+            border-color : #3d6494;
+            color        : #c8d8e8;
+        }
+
+        /* ── Spinner ── */
+        .spinner {
+            width         : 14px;
+            height        : 14px;
+            border        : 2px solid rgba(255,255,255,.3);
+            border-top    : 2px solid #fff;
+            border-radius : 50%;
+            animation     : spin .7s linear infinite;
+            display       : none;
+        }
+        .spinner.show { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Success screen ── */
+        .success-wrap {
+            text-align    : center;
+            padding       : 10px 0 24px;
+            display       : none;
+        }
+        .success-wrap.show { display: block; }
+
+        .success-circle {
+            width           : 68px;
+            height          : 68px;
+            background      : rgba(39,174,96,.15);
+            border          : 2px solid rgba(39,174,96,.35);
+            border-radius   : 50%;
+            display         : inline-flex;
+            align-items     : center;
+            justify-content : center;
+            font-size       : 30px;
+            margin-bottom   : 16px;
+        }
+
+        .success-title {
+            font-size      : 16px;
+            font-weight    : 700;
+            color          : #e8edf5;
+            margin-bottom  : 8px;
+        }
+
+        .success-desc {
+            font-size    : 12px;
+            color        : #7a8fa8;
+            line-height  : 1.7;
+            margin-bottom: 8px;
+        }
+
+        .success-detail {
+            background    : #1e2d42;
+            border        : 1px solid #2a3a54;
+            border-radius : 8px;
+            padding       : 14px 18px;
+            margin        : 16px 0 24px;
+            text-align    : left;
+        }
+
+        .success-detail-row {
+            display         : flex;
+            justify-content : space-between;
+            align-items     : center;
+            padding         : 5px 0;
+            font-size       : 12px;
+            border-bottom   : 1px solid #2a3a50;
+        }
+
+        .success-detail-row:last-child {
+            border-bottom : none;
+        }
+
+        .success-detail-row .sd-label {
+            color          : #7a8fa8;
+            text-transform : uppercase;
+            font-size      : 10px;
+            letter-spacing : .8px;
+        }
+
+        .success-detail-row .sd-value {
+            color       : #c8d8e8;
+            font-weight : 600;
+        }
+
+        .role-badge {
+            padding       : 2px 10px;
+            border-radius : 20px;
+            font-size     : 10px;
+            font-weight   : 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+        }
+
+        .role-pjm {
+            background : rgba(99,102,241,.2);
+            color      : #a5b4fc;
+            border     : 1px solid rgba(99,102,241,.3);
+        }
+
+        .role-coordinator {
+            background : rgba(20,184,166,.15);
+            color      : #5eead4;
+            border     : 1px solid rgba(20,184,166,.3);
+        }
+
+        /* ── Card footer ── */
+        .card-footer {
+            border-top  : 1px solid #2a3a50;
+            margin-top  : 24px;
+            padding-top : 16px;
+            display     : flex;
+            gap         : 24px;
+        }
+
+        .footer-badge {
+            display     : flex;
+            align-items : flex-start;
+            gap         : 6px;
+            font-size   : 9px;
+            color       : #4a6080;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            line-height : 1.4;
+        }
+
+        /* ── Loading overlay ── */
+        .loading-overlay {
+            position        : fixed;
+            inset           : 0;
+            background      : rgba(10,15,25,.7);
+            display         : none;
+            align-items     : center;
+            justify-content : center;
+            z-index         : 9999;
+            flex-direction  : column;
+            gap             : 14px;
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-overlay .spin-lg {
+            width         : 40px;
+            height        : 40px;
+            border        : 3px solid rgba(255,255,255,.15);
+            border-top    : 3px solid #3d8ef0;
+            border-radius : 50%;
+            animation     : spin .8s linear infinite;
+        }
+        .loading-overlay p {
+            color      : #a0b4cc;
+            font-size  : 13px;
+            letter-spacing: 1px;
+        }
+
+        /* ── Access denied screen ── */
+        .access-denied {
+            text-align : center;
+            padding    : 20px 0;
+            display    : none;
+        }
+        .access-denied.show { display: block; }
+        .denied-icon  {
+            font-size     : 48px;
+            margin-bottom : 16px;
+        }
+        .denied-title {
+            font-size      : 16px;
+            font-weight    : 700;
+            color          : #e74c3c;
+            margin-bottom  : 8px;
+        }
+        .denied-desc {
+            font-size    : 12px;
+            color        : #7a8fa8;
+            line-height  : 1.6;
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Loading overlay ── -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spin-lg"></div>
+    <p>Verifying access...</p>
+</div>
+
+<div class="card">
+
+    <!-- ── Logo ── -->
+    <div class="logo-row">
+        <div class="logo-icon-box">⚙️</div>
+        <div>
+            <div class="logo-title">PJM Build Plan</div>
+            <div class="logo-sub">Project Management System</div>
+        </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- ACCESS DENIED                          -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="access-denied" id="access-denied">
+        <div class="denied-icon">🔒</div>
+        <div class="denied-title">Access Denied</div>
+        <div class="denied-desc">
+            Only <strong style="color:#5eead4;">
+            Sample Coordinators</strong> can register new users.<br>
+            You do not have permission to access this page.
+        </div>
+        <button class="btn-ghost" onclick="goBack()">
+            ← Go Back
+        </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- REGISTER FORM                          -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="register-form-wrap" style="display:none;">
+
+        <!-- Info banner -->
+        <div class="info-banner">
+            <span>👤</span>
+            <span>
+                Register a new user — they will receive a
+                <strong style="color:#e8edf5;">
+                default password</strong> and must reset it
+                on first login.
+            </span>
+        </div>
+
+        <!-- Alerts -->
+        <div class="alert alert-error" id="form-error">
+            <span class="alert-icon">⚠️</span>
+            <span id="form-error-msg"></span>
+        </div>
+
+        <div class="alert alert-success" id="form-success">
+            <span class="alert-icon">✅</span>
+            <span id="form-success-msg"></span>
+        </div>
+
+        <form id="register-form" novalidate onsubmit="return false;">
+
+            <!-- ── User Details ── -->
+            <div class="section-label">User Details</div>
+
+            <!-- Full Name -->
+            <div class="field-group">
+                <label class="field-label">
+                    Full Name <span class="field-required">*</span>
+                </label>
+                <div class="input-wrap">
+                    <span class="input-icon">👤</span>
+                    <input type="text"
+                           class="field-input"
+                           id="inp-name"
+                           placeholder="e.g. Ahmad bin Ali"
+                           autocomplete="name">
+                </div>
+                <div class="field-error" id="err-name"></div>
+            </div>
+
+            <!-- Email -->
+            <div class="field-group">
+                <label class="field-label">
+                    Company Email <span class="field-required">*</span>
+                </label>
+                <div class="input-wrap">
+                    <span class="input-icon">✉️</span>
+                    <input type="email"
+                           class="field-input"
+                           id="inp-email"
+                           placeholder="yourname@company.com"
+                           autocomplete="email">
+                </div>
+                <div class="field-error" id="err-email"></div>
+            </div>
+
+            <!-- Role -->
+            <div class="field-group">
+                <label class="field-label">
+                    Role <span class="field-required">*</span>
+                </label>
+                <div class="input-wrap select-wrap">
+                    <span class="input-icon">🏷️</span>
+                    <select class="field-select" id="inp-role">
+                        <option value="">— Select Role —</option>
+                        <option value="pjm">PJM</option>
+                        <option value="sample coordinator">
+                            Sample Coordinator
+                        </option>
+                    </select>
+                    <span class="select-chevron">▼</span>
+                </div>
+                <div class="field-error" id="err-role"></div>
+            </div>
+
+            <!-- ── Password Section ── -->
+            <div class="section-label" style="margin-top:20px;">
+                Password
+            </div>
+
+            <!-- Default password notice -->
+            <div class="default-pw-notice">
+                <span style="font-size:16px; flex-shrink:0;">ℹ️</span>
+                <div>
+                    All new users will be assigned the default password:
+                    <strong id="show-default-pw">Pjm@12345</strong>
+                    <br>
+                    <span style="color:#7a8fa8; font-size:11px;">
+                        User <strong style="color:#a0b4cc;">
+                        must reset their password</strong>
+                        after first login via Forgot Password.
+                    </span>
+                </div>
+            </div>
+
+            <!-- Confirm default password (coordinator must type it) -->
+            <div class="field-group" style="margin-top:14px;">
+                <label class="field-label">
+                    Confirm Default Password
+                    <span class="field-required">*</span>
+                </label>
+                <div class="input-wrap password-wrap">
+                    <span class="input-icon">🔒</span>
+                    <input type="password"
+                           class="field-input"
+                           id="inp-confirm-pw"
+                           placeholder="Re-type default password to confirm"
+                           autocomplete="new-password">
+                    <button class="toggle-pw"
+                            type="button"
+                            onclick="togglePw('inp-confirm-pw', this)">
+                        👁️
+                    </button>
+                </div>
+                <div class="field-error" id="err-confirm-pw"></div>
+            </div>
+
+        </form>
+
+        <!-- Buttons -->
+        <button class="btn-primary"
+                id="btn-register"
+                onclick="registerUser()">
+            <div class="spinner" id="spin-register"></div>
+            <span id="btn-register-label">➕ Register User</span>
+        </button>
+
+        <button class="btn-ghost" onclick="goBack()">
+            ← Back to Dashboard
+        </button>
+
+    </div><!-- /register-form-wrap -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SUCCESS SCREEN                         -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="success-wrap" id="success-wrap">
+
+        <div class="success-circle">✅</div>
+        <div class="success-title">User Registered!</div>
+        <div class="success-desc">
+            New user has been successfully created.<br>
+            Share the default password with them to login.
+        </div>
+
+        <!-- Created user summary -->
+        <div class="success-detail" id="success-detail">
+            <!-- filled by JS -->
+        </div>
+
+        <!-- Default password reminder -->
+        <div class="default-pw-notice" style="margin-bottom:20px;">
+            <span style="font-size:16px; flex-shrink:0;">⚠️</span>
+            <div>
+                Remind the user to
+                <strong style="color:#e8edf5;">
+                reset their password</strong>
+                after first login using
+                <em style="color:#a0b4cc;">Forgot Password</em>
+                on the login page.
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="registerAnother()">
+            ➕ Register Another User
+        </button>
+
+        <button class="btn-ghost"
+                style="margin-top:10px;"
+                onclick="goBack()">
+            ← Back to Dashboard
+        </button>
+
+    </div>
+
+    <!-- ── Footer ── -->
+    <div class="card-footer">
+        <div class="footer-badge">
+            <span>🔒</span>
+            <span>Coordinator<br>Access Only</span>
+        </div>
+        <div class="footer-badge">
+            <span>⚠️</span>
+            <span>Unauthorized Access<br>Is Prohibited</span>
+        </div>
+    </div>
+
+</div><!-- /card -->
+
+<div class="version-tag">PJM Build Plan v1.0</div>
+
+<script>
+"use strict";
+
+// ── Default password for all new users ───────────────────────
+const DEFAULT_PASSWORD = "Pjm@12345";
+
+// ── Wait for window.db ────────────────────────────────────────
+function waitForDb() {
+    return new Promise(function (resolve) {
+        if (window.db && typeof window.db.from === "function") {
+            resolve(); return;
+        }
+        const t = setInterval(function () {
+            if (window.db && typeof window.db.from === "function") {
+                clearInterval(t); resolve();
+            }
+        }, 100);
+    });
+}
+
+// ═════════════════════════════════════════════════════════════
+// PAGE GUARD — only sample coordinator allowed
+// ═════════════════════════════════════════════════════════════
+window.addEventListener("load", async function () {
+    showOverlay(true);
+    await waitForDb();
+
+    try {
+        // ── Check sessionStorage first ─────────────────────
+        const stored = sessionStorage.getItem("pjm_user");
+        if (stored) {
+            const cached = JSON.parse(stored);
+            if (cached?.role === "sample coordinator") {
+                showOverlay(false);
+                showForm();
+                return;
+            } else {
+                showOverlay(false);
+                showAccessDenied();
+                return;
+            }
+        }
+
+        // ── Check Supabase session ─────────────────────────
+        const { data, error } = await window.db.auth.getSession();
+        if (error || !data?.session) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        // ── Check DB role ──────────────────────────────────
+        const { data: user, error: userErr } = await window.db
+            .from("users")
+            .select("role, is_active, name")
+            .eq("id", data.session.user.id)
+            .single();
+
+        if (userErr || !user || !user.is_active) {
+            window.location.href = "login.html";
+            return;
+        }
+
+        if (user.role !== "sample coordinator") {
+            showOverlay(false);
+            showAccessDenied();
+            return;
+        }
+
+        // ── Access granted ─────────────────────────────────
+        window.currentUser = {
+            id   : data.session.user.id,
+            email: data.session.user.email,
+            name : user.name,
+            role : user.role
+        };
+
+        showOverlay(false);
+        showForm();
+
+    } catch (err) {
+        console.error("Guard error:", err.message);
+        window.location.href = "login.html";
+    }
+});
+
+// ═════════════════════════════════════════════════════════════
+// REGISTER USER
+// ═════════════════════════════════════════════════════════════
+async function registerUser() {
+    const name      = (document.getElementById("inp-name")?.value       || "").trim();
+    const email     = (document.getElementById("inp-email")?.value      || "").trim().toLowerCase();
+    const role      = (document.getElementById("inp-role")?.value       || "").trim();
+    const confirmPw = (document.getElementById("inp-confirm-pw")?.value || "").trim();
+
+    // ── Clear previous errors ──────────────────────────────
+    hideAlert("form-error");
+    hideAlert("form-success");
+    clearErr("inp-name",       "err-name");
+    clearErr("inp-email",      "err-email");
+    clearErr("inp-role",       "err-role");
+    clearErr("inp-confirm-pw", "err-confirm-pw");
+
+    // ── Validate ───────────────────────────────────────────
+    let hasError = false;
+
+    if (!name) {
+        showErr("inp-name", "err-name", "Full name is required.");
+        hasError = true;
+    } else if (name.length < 2) {
+        showErr("inp-name", "err-name", "Name must be at least 2 characters.");
+        hasError = true;
+    }
+
+    if (!email) {
+        showErr("inp-email", "err-email", "Email is required.");
+        hasError = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showErr("inp-email", "err-email", "Please enter a valid email.");
+        hasError = true;
+    }
+
+    if (!role) {
+        showErr("inp-role", "err-role", "Please select a role.");
+        hasError = true;
+    }
+
+    if (!confirmPw) {
+        showErr("inp-confirm-pw", "err-confirm-pw",
+            "Please confirm the default password.");
+        hasError = true;
+    } else if (confirmPw !== DEFAULT_PASSWORD) {
+        showErr("inp-confirm-pw", "err-confirm-pw",
+            `Incorrect. Default password is: ${DEFAULT_PASSWORD}`);
+        hasError = true;
+    }
+
+    if (hasError) return;
+
+    // ── Set loading ────────────────────────────────────────
+    setLoading(true);
+
+    try {
+        // ── STEP 1: Create auth user via Supabase Admin ────
+        // Use signUp to create the auth account
+        const { data: authData, error: authError } =
+            await window.db.auth.signUp({
+                email   : email,
+                password: DEFAULT_PASSWORD,
+                options : {
+                    data: {
+                        name: name,
+                        role: role
+                    }
+                }
+            });
+
+        console.log("✅ Auth signUp:", authData?.user?.id, authError?.message);
+
+        if (authError) {
+            // Handle common errors
+            if (authError.message.toLowerCase().includes("already registered") ||
+                authError.message.toLowerCase().includes("already exists")) {
+                showErr("inp-email", "err-email",
+                    "This email is already registered.");
+                setLoading(false);
+                return;
+            }
+            throw authError;
+        }
+
+        if (!authData?.user) {
+            throw new Error("Failed to create auth user.");
+        }
+
+        const newUserId = authData.user.id;
+
+        // ── STEP 2: Insert into your users table ───────────
+        const { error: dbError } = await window.db
+            .from("users")
+            .insert([{
+                id         : newUserId,   // same as auth user id
+                name       : name,
+                email      : email,
+                role       : role,
+                is_active  : true,
+                created_at : new Date().toISOString(),
+                created_by : window.currentUser?.id || null
+            }]);
+
+        console.log("✅ DB insert:", dbError ? dbError.message : "success");
+
+        if (dbError) {
+            // Auth user created but DB failed — log it
+            console.error("❌ DB insert failed:", dbError.message);
+            throw new Error(
+                "User auth created but database record failed: "
+                + dbError.message
+            );
+        }
+
+        // ── STEP 3: Show success screen ────────────────────
+        showSuccessScreen({ name, email, role });
+
+    } catch (err) {
+        console.error("❌ registerUser:", err.message);
+
+        let msg = "Registration failed. Please try again.";
+
+        if (err.message.includes("already registered") ||
+            err.message.includes("already exists")) {
+            msg = "This email is already registered in the system.";
+            showErr("inp-email", "err-email", msg);
+        } else if (err.message.includes("invalid email")) {
+            msg = "Invalid email format.";
+            showErr("inp-email", "err-email", msg);
+        } else if (err.message.includes("rate limit") ||
+                   err.message.includes("429")) {
+            msg = "Too many requests. Please wait a moment and try again.";
+        } else {
+            msg = err.message;
+        }
+
+        showAlert("form-error", "form-error-msg", msg);
+
+    } finally {
+        setLoading(false);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+// SUCCESS SCREEN
+// ═════════════════════════════════════════════════════════════
+function showSuccessScreen(user) {
+    // Populate success detail card
+    const detail = document.getElementById("success-detail");
+    if (detail) {
+        const roleBadgeClass = user.role === "pjm"
+            ? "role-badge role-pjm"
+            : "role-badge role-coordinator";
+        const roleLabel = user.role === "pjm"
+            ? "PJM"
+            : "Sample Coordinator";
+
+        detail.innerHTML = `
+            <div class="success-detail-row">
+                <span class="sd-label">Name</span>
+                <span class="sd-value">${escHtml(user.name)}</span>
+            </div>
+            <div class="success-detail-row">
+                <span class="sd-label">Email</span>
+                <span class="sd-value">${escHtml(user.email)}</span>
+            </div>
+            <div class="success-detail-row">
+                <span class="sd-label">Role</span>
+                <span class="sd-value">
+                    <span class="${roleBadgeClass}">
+                        ${roleLabel}
+                    </span>
+                </span>
+            </div>
+            <div class="success-detail-row">
+                <span class="sd-label">Default Password</span>
+                <span class="sd-value"
+                      style="font-family:monospace; color:#85c1e9;">
+                    ${DEFAULT_PASSWORD}
+                </span>
+            </div>
+            <div class="success-detail-row">
+                <span class="sd-label">Status</span>
+                <span class="sd-value"
+                      style="color:#2ecc71;">
+                    ✅ Active
+                </span>
+            </div>
+        `;
+    }
+
+    // Hide form, show success
+    document.getElementById("register-form-wrap").style.display = "none";
+    document.getElementById("success-wrap").classList.add("show");
+}
+
+// ── Register another user ─────────────────────────────────────
+function registerAnother() {
+    // Reset form
+    document.getElementById("register-form")?.reset();
+    hideAlert("form-error");
+    hideAlert("form-success");
+    clearErr("inp-name",       "err-name");
+    clearErr("inp-email",      "err-email");
+    clearErr("inp-role",       "err-role");
+    clearErr("inp-confirm-pw", "err-confirm-pw");
+
+    // Show form, hide success
+    document.getElementById("register-form-wrap").style.display = "block";
+    document.getElementById("success-wrap").classList.remove("show");
+}
+
+// ═════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═════════════════════════════════════════════════════════════
+function showForm() {
+    document.getElementById("register-form-wrap").style.display = "block";
+    document.getElementById("access-denied").classList.remove("show");
+}
+
+function showAccessDenied() {
+    document.getElementById("access-denied").classList.add("show");
+    document.getElementById("register-form-wrap").style.display = "none";
+}
+
+function showOverlay(show) {
+    const el = document.getElementById("loading-overlay");
+    if (el) el.classList.toggle("show", show);
+}
+
+function goBack() {
+    // Go back to main app or admin dashboard
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        window.location.href = "autoscheduler.html";
+    }
+}
+
+function togglePw(inputId, btn) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    const hidden    = inp.type === "password";
+    inp.type        = hidden ? "text" : "password";
+    btn.textContent = hidden ? "🙈" : "👁️";
+}
+
+function showAlert(boxId, msgId, msg) {
+    const box = document.getElementById(boxId);
+    const txt = document.getElementById(msgId);
+    if (txt) txt.textContent = msg;
+    if (box) box.classList.add("show");
+}
+
+function hideAlert(boxId) {
+    document.getElementById(boxId)?.classList.remove("show");
+}
+
+function showErr(inputId, errId, msg) {
+    document.getElementById(inputId)?.classList.add("error");
+    const e = document.getElementById(errId);
+    if (e) { e.textContent = msg; e.classList.add("show"); }
+}
+
+function clearErr(inputId, errId) {
+    document.getElementById(inputId)?.classList.remove("error");
+    const e = document.getElementById(errId);
+    if (e) { e.textContent = ""; e.classList.remove("show"); }
+}
+
+function setLoading(loading) {
+    const btn   = document.getElementById("btn-register");
+    const spin  = document.getElementById("spin-register");
+    const label = document.getElementById("btn-register-label");
+    if (btn)   btn.disabled     = loading;
+    if (spin)  spin.classList.toggle("show", loading);
+    if (label) label.textContent = loading
+        ? "Registering…"
+        : "➕ Register User";
+}
+
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+// ── Enter key submits form ────────────────────────────────────
+document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    const wrap = document.getElementById("register-form-wrap");
+    if (wrap?.style.display !== "none") registerUser();
+});
+</script>
+</body>
+</html>

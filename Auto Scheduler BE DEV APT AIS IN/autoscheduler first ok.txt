@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Build Plan Management System</title>
+    
+    <!-- ✅ Load Supabase FIRST before anything else -->
+    <script src="supabase.js"></script>
+    <script src="supabase-config.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script>
+"use strict";
+var ALLOWED_ROLE = "PJM";
+
+(async function guardPage() {
+    console.log("🔍 GUARD: Started");
+
+    // ── Wait for window.db ────────────────────────────────────
+    await new Promise(function (resolve, reject) {
+        if (window.db && typeof window.db.from === "function") {
+            console.log("🔍 GUARD: window.db already ready");
+            resolve();
+            return;
+        }
+        let attempts = 0;
+        const interval = setInterval(function () {
+            attempts++;
+            if (window.db && typeof window.db.from === "function") {
+                clearInterval(interval);
+                console.log("🔍 GUARD: window.db ready after",
+                    attempts, "attempts");
+                resolve();
+            } else if (attempts >= 50) {
+                clearInterval(interval);
+                reject(new Error("DB timeout"));
+            }
+        }, 100);
+    }).catch(function () {
+        console.error("🔍 GUARD: window.db never ready");
+        window.location.href = "login.html";
+        throw new Error("stop");
+    });
+
+    try {
+        // ✅ STEP 1: Check sessionStorage set by auth.js on login
+        console.log("🔍 GUARD: Checking sessionStorage...");
+        const stored = sessionStorage.getItem("pjm_user");
+        console.log("🔍 GUARD: sessionStorage raw =", stored);
+
+        if (stored) {
+            const cachedUser = JSON.parse(stored);
+            console.log("🔍 GUARD: cachedUser =", cachedUser);
+
+            // ✅ Trust sessionStorage — it was set right after login
+            if (cachedUser && cachedUser.role === ALLOWED_ROLE) {
+                window.currentUser = cachedUser;
+                console.log("🔍 GUARD: ✅ Access granted via session →",
+                    cachedUser.name);
+                populateUserBar();
+                return; // ✅ Let them in immediately
+            } else {
+                console.warn("🔍 GUARD: ❌ Wrong role in cache →",
+                    cachedUser?.role);
+                sessionStorage.removeItem("pjm_user");
+                window.location.href =
+                    cachedUser?.role === "sample coordinator"
+                        ? "admin.html"
+                        : "login.html";
+                return;
+            }
+        }
+
+        // ✅ STEP 2: No sessionStorage — try getSession() directly
+        console.log("🔍 GUARD: No sessionStorage, trying getSession()...");
+
+        const { data, error } = await Promise.race([
+            window.db.auth.getSession(),
+            new Promise(function (resolve) {
+                setTimeout(function () {
+                    console.warn("🔍 GUARD: getSession() timed out");
+                    resolve({ data: { session: null }, error: null });
+                }, 5000);
+            })
+        ]);
+
+        console.log("🔍 GUARD: getSession =",
+            data?.session ? data.session.user.email : "null");
+
+        if (error || !data?.session) {
+            console.warn("🔍 GUARD: ❌ No session found");
+            window.location.href = "login.html";
+            return;
+        }
+
+        // ✅ STEP 3: Session exists but no sessionStorage
+        // This happens on page refresh — re-check role from DB
+        console.log("🔍 GUARD: Session found, checking DB...");
+
+        const { data: user, error: userError } =
+            await Promise.race([
+                window.db
+                    .from("users")
+                    .select("role, is_active, name")
+                    .eq("id", data.session.user.id)
+                    .single(),
+                new Promise(function (resolve) {
+                    setTimeout(function () {
+                        console.warn("🔍 GUARD: DB query timed out");
+                        resolve({ data: null, error: { message: "timeout" } });
+                    }, 8000);
+                })
+            ]);
+
+        console.log("🔍 GUARD: DB user =", user);
+        console.log("🔍 GUARD: DB error =", userError?.message || null);
+
+        if (userError || !user) {
+            console.error("🔍 GUARD: ❌ DB query failed →",
+                userError?.message);
+            window.location.href = "login.html";
+            return;
+        }
+
+        if (!user.is_active) {
+            console.warn("🔍 GUARD: ❌ Account deactivated");
+            await window.db.auth.signOut();
+            window.location.href = "login.html";
+            return;
+        }
+
+        if (user.role !== ALLOWED_ROLE) {
+            console.warn("🔍 GUARD: ❌ Wrong role →", user.role);
+            window.location.href =
+                user.role === "sample coordinator"
+                    ? "admin.html"
+                    : "login.html";
+            return;
+        }
+
+        // ✅ All passed
+        window.currentUser = {
+            id   : data.session.user.id,
+            email: data.session.user.email,
+            name : user.name || data.session.user.email.split("@")[0],
+            role : user.role
+        };
+
+        sessionStorage.setItem("pjm_user",
+            JSON.stringify(window.currentUser));
+
+        console.log("🔍 GUARD: ✅ Access granted via DB →",
+            window.currentUser);
+
+        populateUserBar();
+
+    } catch (err) {
+        console.error("🔍 GUARD: ❌ Error →", err.message);
+        window.location.href = "login.html";
+    }
+})();
+
+// ── Populate user bar ─────────────────────────────────────────
+function populateUserBar() {
+    if (!document.getElementById("user-name")) {
+        setTimeout(populateUserBar, 100);
+        return;
+    }
+    const u = window.currentUser;
+    if (!u) return;
+    const nameEl   = document.getElementById("user-name");
+    const roleEl   = document.getElementById("user-role");
+    const avatarEl = document.getElementById("user-avatar");
+    if (nameEl)   nameEl.textContent   = u.name;
+    if (roleEl)   roleEl.textContent   = u.role;
+    if (avatarEl) avatarEl.textContent =
+        u.name.charAt(0).toUpperCase();
+    console.log("🔍 GUARD: ✅ User bar populated →", u.name);
+}
+</script>
+    </script>
+</head>
+
+<body>
+    <!-- ===== USER BAR ===== -->
+    <div class="user-bar" id="user-bar">
+        <div class="user-bar-left">
+            <div class="user-avatar" id="user-avatar">?</div>
+            <div class="user-info">
+                <div class="user-name" id="user-name">Loading...</div>
+                <div class="user-role" id="user-role"></div>
+            </div>
+        </div>
+        <button class="logout-btn" id="logout-btn">
+            🔓 Logout
+        </button>
+    </div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <div class="logo-icon">&#9881;</div>
+                <div>
+                    <div class="header-title">PJM Build Plan</div>
+                    <div class="header-subtitle">Project Management System</div>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="header-stats">
+                <div class="stat-badge">
+                    <span>Total Projects:</span>
+                    <span class="stat-num" id="stat-total">0</span>
+                </div>
+                <div class="stat-badge">
+                    <span>This Week:</span>
+                    <span class="stat-num" id="stat-week">0</span>
+                </div>
+                <div class="stat-badge">
+                    <span>Equipment In Use:</span>
+                    <span class="stat-num" id="stat-equipment">0</span>
+                </div>
+            </div>
+            <div class="current-date" id="current-date"></div>
+        </div>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <div class="main-container">
+
+        <!-- ===== SIDEBAR FORM ===== -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-icon">&#10010;</span>
+                <h2>Add New Build Plan</h2>
+            </div>
+            <div class="form-scroll">
+                <form id="project-form" novalidate>
+
+                    <!-- Project Info -->
+                    <div class="section-divider">
+                        <span class="section-label">Project Info</span>
+                    </div>
+
+                    <!-- PJM Name -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            PJM Name <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-pjm"
+                            placeholder="e.g., PJM-2024-001">
+                        <div class="error-msg" id="err-pjm"></div>
+                    </div>
+
+                    <!-- Project Title -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Project Title <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-title"
+                            placeholder="Enter project title">
+                        <div class="error-msg" id="err-title"></div>
+                    </div>
+
+                    <!-- Platform -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Platform <span class="field-required">*</span>
+                        </label>
+                        <div class="select-wrapper">
+                            <select class="form-select custom-select" id="f-platform">
+                                <option value="" disabled selected>
+                                    — Select a platform —
+                                </option>
+                                <optgroup label="📱 Mobile">
+                                    <option value="Platform Alpha - Gen1">Platform Alpha – Gen 1</option>
+                                    <option value="Platform Alpha - Gen2">Platform Alpha – Gen 2</option>
+                                    <option value="Platform Beta - Gen1">Platform Beta – Gen 1</option>
+                                    <option value="Platform Beta - Gen2">Platform Beta – Gen 2</option>
+                                </optgroup>
+                                <optgroup label="🖥️ Compute">
+                                    <option value="Platform Gamma - HPC">Platform Gamma – HPC</option>
+                                    <option value="Platform Gamma - Server">Platform Gamma – Server</option>
+                                    <option value="Platform Delta - Desktop">Platform Delta – Desktop</option>
+                                    <option value="Platform Delta - Laptop">Platform Delta – Laptop</option>
+                                </optgroup>
+                                <optgroup label="🔌 IoT / Embedded">
+                                    <option value="Platform Epsilon - IoT">Platform Epsilon – IoT</option>
+                                    <option value="Platform Zeta - MCU">Platform Zeta – MCU</option>
+                                </optgroup>
+                                <optgroup label="🚗 Automotive">
+                                    <option value="Platform Eta - ADAS">Platform Eta – ADAS</option>
+                                    <option value="Platform Theta - Infotainment">Platform Theta – Infotainment</option>
+                                </optgroup>
+                            </select>
+                            <span class="select-arrow">&#9660;</span>
+                        </div>
+                        <div class="error-msg" id="err-platform"></div>
+                    </div>
+
+                    <!-- Equipment -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Equipment <span class="field-required">*</span>
+                        </label>
+                        <div class="select-wrapper">
+                            <select class="form-select custom-select" id="f-equipment"
+                                onchange="liveConflictCheck()">
+                                <option value="" disabled selected>
+                                    — Select equipment —
+                                </option>
+                                <optgroup label="⚙️ Machines">
+                                    <option value="Equipment A - Machine 01">Equipment A – Machine 01</option>
+                                    <option value="Equipment B - Machine 02">Equipment B – Machine 02</option>
+                                    <option value="Equipment C - Machine 03">Equipment C – Machine 03</option>
+                                </optgroup>
+                                <optgroup label="🔬 Analyzers">
+                                    <option value="Equipment D - Analyzer 01">Equipment D – Analyzer 01</option>
+                                    <option value="Equipment E - Analyzer 02">Equipment E – Analyzer 02</option>
+                                </optgroup>
+                                <optgroup label="🧪 Testers">
+                                    <option value="Equipment F - Tester 01">Equipment F – Tester 01</option>
+                                    <option value="Equipment G - Tester 02">Equipment G – Tester 02</option>
+                                </optgroup>
+                                <optgroup label="📡 Scanners">
+                                    <option value="Equipment H - Scanner 01">Equipment H – Scanner 01</option>
+                                </optgroup>
+                            </select>
+                            <span class="select-arrow">&#9660;</span>
+                        </div>
+                        <div class="error-msg" id="err-equipment"></div>
+                    </div>
+
+                    <!-- UPD -->
+                    <div class="field-group">
+                        <label class="field-label">
+                            Unit Process Development (UPD)
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="select-wrapper">
+                            <select class="form-select custom-select" id="f-pic"
+                                onchange="liveConflictCheck()">
+                                <option value="" disabled selected>
+                                    — Select UPD person —
+                                </option>
+                                <optgroup label="👤 Team Alpha">
+                                    <option value="Alice Johnson">Alice Johnson</option>
+                                    <option value="Aaron Lee">Aaron Lee</option>
+                                    <option value="Aisha Patel">Aisha Patel</option>
+                                </optgroup>
+                                <optgroup label="👤 Team Beta">
+                                    <option value="Brian Chen">Brian Chen</option>
+                                    <option value="Beth Martinez">Beth Martinez</option>
+                                    <option value="Benjamin Okafor">Benjamin Okafor</option>
+                                </optgroup>
+                                <optgroup label="👤 Team Gamma">
+                                    <option value="Carlos Rivera">Carlos Rivera</option>
+                                    <option value="Clara Nguyen">Clara Nguyen</option>
+                                    <option value="Chris Adeyemi">Chris Adeyemi</option>
+                                </optgroup>
+                                <optgroup label="👤 Team Delta">
+                                    <option value="Diana Kovacs">Diana Kovacs</option>
+                                    <option value="David Kim">David Kim</option>
+                                    <option value="Demi Hassan">Demi Hassan</option>
+                                </optgroup>
+                            </select>
+                            <span class="select-arrow">&#9660;</span>
+                        </div>
+                        <div class="error-msg" id="err-pic"></div>
+                    </div>
+
+                    <!-- Schedule -->
+                    <div class="section-divider">
+                        <span class="section-label">Schedule</span>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Start Date &amp; Time
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-start-date"
+                                onchange="liveConflictCheck()">
+                            <select class="form-select time-select"
+                                id="f-start-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-start"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            End Date &amp; Time
+                            <span class="field-required">*</span>
+                        </label>
+                        <div class="date-time-group">
+                            <input type="date" class="form-input"
+                                id="f-end-date"
+                                onchange="liveConflictCheck()">
+                            <select class="form-select time-select"
+                                id="f-end-time"
+                                onchange="liveConflictCheck()">
+                            </select>
+                        </div>
+                        <div class="error-msg" id="err-end"></div>
+                    </div>
+
+                    <!-- Live Clash Alert -->
+                    <div id="live-conflict-box" class="live-conflict-box hidden">
+                        <div class="live-conflict-title">
+                            &#9888; Scheduling Clash Detected
+                        </div>
+                        <div id="live-conflict-list"></div>
+                    </div>
+
+                    <!-- Sample Info -->
+                    <div class="section-divider">
+                        <span class="section-label">Sample Information</span>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Quantity <span class="field-required">*</span>
+                        </label>
+                        <input type="number" class="form-input" id="f-qty"
+                            placeholder="e.g., 100" min="1">
+                        <div class="error-msg" id="err-qty"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            No. of Lot <span class="field-required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="f-lot"
+                            placeholder="e.g., LOT-2024-001">
+                        <div class="error-msg" id="err-lot"></div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">
+                            Special Instructions (Optional)
+                        </label>
+                        <textarea class="form-textarea" id="f-notes"
+                            placeholder="Additional notes..."></textarea>
+                    </div>
+
+                </form>
+            </div>
+            <div class="form-buttons">
+                <button class="btn btn-success" id="save-btn" onclick="saveProject()">
+                    &#128190; Save Project
+                </button>
+                <button class="btn btn-ghost" onclick="clearForm()">
+                    &#8635; Clear Form
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===== RIGHT CONTENT ===== -->
+        <div class="right-content">
+
+            <!-- Tabs -->
+            <div class="tabs-header">
+                <button class="tab-btn active"
+                    onclick="switchTab('calendar')"
+                    id="tab-calendar">
+                    &#128197; Weekly Calendar
+                </button>
+                <button class="tab-btn"
+                    onclick="switchTab('list')"
+                    id="tab-list">
+                    &#128203; Project List
+                </button>
+            </div>
+
+            <!-- ===== CALENDAR TAB ===== -->
+            <div class="tab-content active" id="tab-content-calendar">
+                <div class="calendar-nav">
+                    <div class="cal-nav-btns">
+                        <button class="btn btn-ghost btn-sm" onclick="prevWeek()">
+                            &#9664; Prev
+                        </button>
+                        <button class="btn btn-accent2 btn-sm" onclick="goToToday()">
+                            Today
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="nextWeek()">
+                            Next &#9654;
+                        </button>
+                    </div>
+                    <div class="calendar-nav-center">
+                        <div class="week-label" id="week-label">Loading...</div>
+                    </div>
+                    <div class="calendar-legend" id="calendar-legend"></div>
+                </div>
+                <div class="calendar-wrapper">
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                </div>
+            </div>
+
+            <!-- ===== LIST TAB ===== -->
+            <div class="tab-content" id="tab-content-list">
+                <div class="list-toolbar">
+                    <div class="list-toolbar-left">
+                        <div class="search-box">
+                            <span class="search-icon">&#128269;</span>
+                            <input type="text" id="search-input"
+                                placeholder="Search projects..."
+                                oninput="filterProjects()">
+                        </div>
+                        <select class="filter-select"
+                            id="filter-equipment"
+                            onchange="filterProjects()">
+                            <option value="">All Equipment</option>
+                        </select>
+                        <select class="filter-select"
+                            id="filter-pic"
+                            onchange="filterProjects()">
+                            <option value="">All UPD</option>
+                        </select>
+                        <select class="filter-select"
+                            id="filter-platform"
+                            onchange="filterProjects()">
+                            <option value="">All Platforms</option>
+                        </select>
+                    </div>
+                    <div class="list-toolbar-right">
+                        <span id="selected-count" class="selected-count"></span>
+                        <button class="btn btn-danger btn-sm"
+                            onclick="deleteSelected()">
+                            &#128465; Delete Selected
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
+                            &#128228; Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="project-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-cell">
+                                    <input type="checkbox"
+                                        id="select-all"
+                                        onchange="toggleSelectAll()">
+                                </th>
+                                <th data-col="rowNum">#</th>
+                                <th onclick="sortTable('pjm')" data-col="pjm">PJM Name</th>
+                                <th onclick="sortTable('title')" data-col="title">Project Title</th>
+                                <th onclick="sortTable('platform')" data-col="platform">Platform</th>
+                                <th onclick="sortTable('equipment')" data-col="equipment">Equipment</th>
+                                <th onclick="sortTable('pic')" data-col="pic">UPD</th>
+                                <th onclick="sortTable('start')" data-col="start">Start</th>
+                                <th onclick="sortTable('end')" data-col="end">End</th>
+                                <th onclick="sortTable('qty')" data-col="qty">Qty</th>
+                                <th onclick="sortTable('lot')" data-col="lot">No. of Lot</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="project-tbody"></tbody>
+                    </table>
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-icon">&#128203;</div>
+                        <div class="empty-title">No Projects Found</div>
+                        <div class="empty-desc">
+                            Add a new project using the form on the left
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DETAIL MODAL ===== -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal">
+            <div class="modal-header" id="modal-header">
+                <div>
+                    <div class="modal-title" id="modal-title"></div>
+                    <div class="modal-subtitle" id="modal-subtitle"></div>
+                </div>
+                <button class="modal-close"
+                    onclick="closeModal('detail-modal')">
+                    &#10005;
+                </button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer"></div>
+        </div>
+    </div>
+
+    <!-- ===== CLASH BLOCK MODAL ===== -->
+    <div class="modal-overlay" id="clash-modal">
+        <div class="modal">
+            <div class="modal-header clash-modal-header">
+                <div>
+                    <div class="modal-title">&#128683; Save Blocked</div>
+                    <div class="modal-subtitle">
+                        Resolve all clashes before saving
+                    </div>
+                </div>
+                <button class="modal-close"
+                    onclick="closeModal('clash-modal')">
+                    &#10005;
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="clash-modal-content"></div>
+                <div class="clash-instruction">
+                    Please change the <strong>Equipment</strong>,
+                    <strong>UPD</strong>, or
+                    <strong>schedule</strong> to resolve these
+                    clashes before saving.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"
+                    onclick="closeModal('clash-modal')">
+                    &#8592; Go Back &amp; Edit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- ===== SCRIPTS ===== -->
+    <!-- ✅ script.js loads AFTER supabase (already loaded in <head>) -->
+    <script src="script.js"></script>
+
+    <!-- ===== DROPDOWN STYLES ===== -->
+    <style>
+        .select-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .select-wrapper .custom-select {
+            width: 100%;
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 38px;
+            cursor: pointer;
+            background: #fff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .select-wrapper .custom-select:focus {
+            border-color: var(--accent, #6366f1);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+            outline: none;
+        }
+        .select-wrapper .custom-select:hover:not(:disabled) {
+            border-color: #a5b4fc;
+        }
+        .select-arrow {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: #64748b;
+            pointer-events: none;
+            transition: transform 0.25s;
+        }
+        .select-wrapper .custom-select:focus ~ .select-arrow {
+            transform: translateY(-50%) rotate(180deg);
+            color: var(--accent, #6366f1);
+        }
+        select.input-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 3px rgba(239,68,68,0.12) !important;
+        }
+        .custom-select optgroup {
+            font-weight: 700;
+            font-size: 12px;
+            color: #374151;
+            background: #f8fafc;
+        }
+        .custom-select option {
+            font-weight: 400;
+            color: #1e293b;
+            padding: 6px 8px;
+            background: #fff;
+        }
+        .custom-select option:checked {
+            background: #ede9fe;
+            color: #5b21b6;
+        }
+        .equipment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+            color: #065f46;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 20px;
+            border: 1px solid #6ee7b7;
+            white-space: nowrap;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .upd-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            color: #1e40af;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 20px;
+            border: 1px solid #93c5fd;
+            white-space: nowrap;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .platform-badge {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+            color: #5b21b6;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 20px;
+            border: 1px solid #c4b5fd;
+            white-space: nowrap;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .field-preview {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #64748b;
+            padding: 5px 10px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .field-preview.visible { display: flex; }
+        .field-preview-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #6366f1;
+            flex-shrink: 0;
+        }
+    </style>
+
+    <!-- ===== DROPDOWN INTEGRATION PATCH ===== -->
+    <script>
+    "use strict";
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // ── 1. Live preview under each dropdown ──────────────
+        function addLivePreview(selectId, previewId, colorClass) {
+            const sel = document.getElementById(selectId);
+            if (!sel) return;
+            const preview = document.createElement("div");
+            preview.className = "field-preview";
+            preview.id = previewId;
+            preview.innerHTML = `
+                <div class="field-preview-dot"
+                    style="background:${colorClass}"></div>
+                <span class="preview-text"></span>`;
+            sel.closest(".select-wrapper")
+               .insertAdjacentElement("afterend", preview);
+            sel.addEventListener("change", function () {
+                const val = sel.options[sel.selectedIndex]?.text || "";
+                if (sel.value) {
+                    preview.querySelector(".preview-text").textContent =
+                        `Selected: ${val}`;
+                    preview.classList.add("visible");
+                } else {
+                    preview.classList.remove("visible");
+                }
+                sel.classList.remove("input-error");
+                const errId = selectId === "f-equipment"
+                    ? "err-equipment" : "err-pic";
+                const errEl = document.getElementById(errId);
+                if (errEl) errEl.textContent = "";
+            });
+        }
+
+        addLivePreview("f-equipment", "preview-equipment", "#059669");
+        addLivePreview("f-pic",       "preview-pic",       "#2563eb");
+
+        // ── 2. Patch clearForm ────────────────────────────────
+        const _origClear = window.clearForm;
+        if (typeof _origClear === "function") {
+            window.clearForm = function () {
+                _origClear.call(this);
+                ["f-equipment", "f-pic", "f-platform"].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.value = "";
+                        el.classList.remove("input-error");
+                    }
+                });
+                ["preview-equipment", "preview-pic"].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.remove("visible");
+                });
+                ["err-equipment", "err-pic", "err-platform"].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = "";
+                });
+            };
+        }
+
+        // ── 3. Patch saveProject ──────────────────────────────
+        const _origSave = window.saveProject;
+        if (typeof _origSave === "function") {
+            window.saveProject = function () {
+                let valid = true;
+                const platformVal = document.getElementById("f-platform")?.value;
+                if (!platformVal) {
+                    showDropdownError("f-platform", "err-platform",
+                        "Please select a platform.");
+                    valid = false;
+                }
+                const equipVal = document.getElementById("f-equipment")?.value;
+                if (!equipVal) {
+                    showDropdownError("f-equipment", "err-equipment",
+                        "Please select an equipment.");
+                    valid = false;
+                }
+                const picVal = document.getElementById("f-pic")?.value;
+                if (!picVal) {
+                    showDropdownError("f-pic", "err-pic",
+                        "Please select a UPD person.");
+                    valid = false;
+                }
+                if (!valid) {
+                    const firstErr = document.querySelector("select.input-error");
+                    if (firstErr) firstErr.scrollIntoView(
+                        { behavior: "smooth", block: "center" });
+                    return;
+                }
+                const lenBefore = typeof projects !== "undefined"
+                    ? projects.length : 0;
+                _origSave.call(this);
+                const lenAfter = typeof projects !== "undefined"
+                    ? projects.length : 0;
+                if (lenAfter > lenBefore && typeof projects !== "undefined") {
+                    const newest = projects[projects.length - 1];
+                    newest.platform = platformVal;
+                    if (typeof saveToStorage  === "function") saveToStorage();
+                    if (typeof renderTable    === "function") renderTable();
+                    if (typeof renderCalendar === "function") renderCalendar();
+                }
+                ["preview-equipment", "preview-pic"].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.remove("visible");
+                });
+            };
+        }
+
+        // ── 4. Patch renderTable ──────────────────────────────
+        const _origRender = window.renderTable;
+        if (typeof _origRender === "function") {
+            window.renderTable = function (...args) {
+                _origRender.apply(this, args);
+                styleBadgesInTable();
+                injectPlatformCells();
+                populatePlatformFilter();
+            };
+        }
+
+        // ── 5. Patch filterProjects ───────────────────────────
+        const _origFilter = window.filterProjects;
+        if (typeof _origFilter === "function") {
+            window.filterProjects = function (...args) {
+                _origFilter.apply(this, args);
+                applyPlatformFilter();
+            };
+        }
+
+        // ── 6. Populate user bar AFTER guard sets currentUser ─
+        function populateUserBar() {
+            if (!window.currentUser) {
+                // retry until guard has finished
+                setTimeout(populateUserBar, 150);
+                return;
+            }
+            const nameEl   = document.getElementById("user-name");
+            const roleEl   = document.getElementById("user-role");
+            const avatarEl = document.getElementById("user-avatar");
+            if (nameEl)   nameEl.textContent   = window.currentUser.name;
+            if (roleEl)   roleEl.textContent   = window.currentUser.role;
+            if (avatarEl) avatarEl.textContent =
+                window.currentUser.name.charAt(0).toUpperCase();
+        }
+        populateUserBar();
+
+        // ── 7. Logout button ──────────────────────────────────
+        const logoutBtn = document.getElementById("logout-btn");
+        if (logoutBtn) {
+            logoutBtn.addEventListener("click", async function () {
+                try {
+                    await window.db.auth.signOut();
+                    window.location.href = "index.html";
+                } catch (e) {
+                    console.error("Logout error:", e.message);
+                    window.location.href = "index.html";
+                }
+            });
+        }
+
+        // Initial render
+        setTimeout(function () {
+            styleBadgesInTable();
+            populatePlatformFilter();
+        }, 100);
+    });
+
+    // ── Dropdown error helper ─────────────────────────────────
+    function showDropdownError(fieldId, errId, msg) {
+        const field = document.getElementById(fieldId);
+        const err   = document.getElementById(errId);
+        if (field) field.classList.add("input-error");
+        if (err)   err.textContent = msg;
+    }
+
+    // ── Style badges in table ─────────────────────────────────
+    function styleBadgesInTable() {
+        if (typeof projects === "undefined") return;
+        const tbody = document.getElementById("project-tbody");
+        if (!tbody) return;
+        tbody.querySelectorAll("tr").forEach(function (row) {
+            const cells = row.querySelectorAll("td");
+            cells.forEach(function (td) {
+                const txt = td.textContent.trim();
+                if (!td.querySelector(".equipment-badge") &&
+                    !td.querySelector(".upd-badge") &&
+                    !td.querySelector(".platform-badge") &&
+                    isEquipmentValue(txt)) {
+                    td.innerHTML =
+                        `<span class="equipment-badge">⚙️ ${txt}</span>`;
+                }
+                if (!td.querySelector(".equipment-badge") &&
+                    !td.querySelector(".upd-badge") &&
+                    !td.querySelector(".platform-badge") &&
+                    isUPDValue(txt)) {
+                    td.innerHTML =
+                        `<span class="upd-badge">👤 ${txt}</span>`;
+                }
+            });
+        });
+    }
+
+    function isEquipmentValue(txt) {
+        return [
+            "Equipment A - Machine 01", "Equipment B - Machine 02",
+            "Equipment C - Machine 03", "Equipment D - Analyzer 01",
+            "Equipment E - Analyzer 02", "Equipment F - Tester 01",
+            "Equipment G - Tester 02",  "Equipment H - Scanner 01"
+        ].some(function (o) {
+            return txt.includes("Equipment") &&
+                   txt.includes(o.split(" - ")[1]);
+        });
+    }
+
+    function isUPDValue(txt) {
+        return [
+            "Alice Johnson",  "Aaron Lee",       "Aisha Patel",
+            "Brian Chen",     "Beth Martinez",   "Benjamin Okafor",
+            "Carlos Rivera",  "Clara Nguyen",    "Chris Adeyemi",
+            "Diana Kovacs",   "David Kim",       "Demi Hassan"
+        ].includes(txt.trim());
+    }
+
+    // ── Inject platform cells ─────────────────────────────────
+    function injectPlatformCells() {
+        if (typeof projects === "undefined") return;
+        const tbody = document.getElementById("project-tbody");
+        if (!tbody) return;
+        tbody.querySelectorAll("tr").forEach(function (row) {
+            if (row.querySelector("td[data-platform-cell]")) return;
+            const id = row.getAttribute("data-id");
+            if (!id) return;
+            const proj = projects.find(function (p) {
+                return String(p.id) === String(id);
+            });
+            if (!proj) return;
+            const cells = row.querySelectorAll("td");
+            if (cells.length < 4) return;
+            const td = document.createElement("td");
+            td.setAttribute("data-platform-cell", "1");
+            td.innerHTML = proj.platform
+                ? `<span class="platform-badge">🖥️ ${proj.platform}</span>`
+                : `<span style="color:#94a3b8;font-size:12px;">—</span>`;
+            cells[3].insertAdjacentElement("afterend", td);
+        });
+    }
+
+    // ── Populate platform filter ──────────────────────────────
+    function populatePlatformFilter() {
+        const sel = document.getElementById("filter-platform");
+        if (!sel || typeof projects === "undefined") return;
+        const current   = sel.value;
+        const platforms = [...new Set(
+            projects.map(function (p) { return p.platform; })
+                    .filter(Boolean)
+        )].sort();
+        sel.innerHTML = '<option value="">All Platforms</option>';
+        platforms.forEach(function (p) {
+            const opt = document.createElement("option");
+            opt.value = p;
+            opt.textContent = p;
+            if (p === current) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }
+
+    // ── Apply platform filter ─────────────────────────────────
+    function applyPlatformFilter() {
+        const sel = document.getElementById("filter-platform");
+        if (!sel || !sel.value) return;
+        const value = sel.value.toLowerCase();
+        const tbody = document.getElementById("project-tbody");
+        if (!tbody) return;
+        tbody.querySelectorAll("tr").forEach(function (row) {
+            const cell = row.querySelector("td[data-platform-cell]");
+            if (!cell) return;
+            const txt = cell.textContent.trim().toLowerCase();
+            row.style.display = txt.includes(value) ? "" : "none";
+        });
+        const allRows   = tbody.querySelectorAll("tr");
+        const allHidden = [...allRows].every(function (r) {
+            return r.style.display === "none";
+        });
+        const emptyState = document.getElementById("empty-state");
+        if (emptyState) emptyState.style.display =
+            allHidden ? "block" : "none";
+    }
+    </script>
+
+</body>
+</html>

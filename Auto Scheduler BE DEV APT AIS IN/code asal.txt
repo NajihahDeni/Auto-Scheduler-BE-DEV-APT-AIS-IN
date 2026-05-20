@@ -1,0 +1,2852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Build Plan Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0f0f1a;
+            --sidebar: #1a1a2e;
+            --card: #16213e;
+            --card2: #1e2a4a;
+            --accent: #7c3aed;
+            --accent-hover: #6d28d9;
+            --accent2: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --border: #2d3561;
+            --input-bg: #0f0f1a;
+            --header: #1e1b4b;
+            --shadow: rgba(0,0,0,0.4);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e3a5f 100%);
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px var(--shadow);
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(124,58,237,0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #7c3aed, #06b6d4);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(124,58,237,0.4);
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: #a5b4fc;
+            font-weight: 400;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .stat-badge:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
+        .stat-badge .stat-num {
+            font-weight: 700;
+            color: #a5b4fc;
+        }
+
+        .current-date {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        /* ===== SIDEBAR FORM ===== */
+        .sidebar {
+            width: 340px;
+            background: var(--sidebar);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .form-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .form-section {
+            margin-bottom: 6px;
+        }
+
+        .section-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0 10px 0;
+        }
+
+        .section-divider::before,
+        .section-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        .field-group {
+            margin-bottom: 12px;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .field-required {
+            color: var(--danger);
+            margin-left: 2px;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 12px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+            background: #1a1a2e;
+        }
+
+        .form-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+        }
+
+        .form-select option {
+            background: var(--card);
+            color: var(--text);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 65px;
+        }
+
+        .date-time-group {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+        }
+
+        .time-select {
+            width: 100px;
+        }
+
+        .form-input.error,
+        .form-select.error {
+            border-color: var(--danger);
+            box-shadow: 0 0 0 3px rgba(239,68,68,0.15);
+        }
+
+        .error-msg {
+            font-size: 10px;
+            color: var(--danger);
+            margin-top: 3px;
+            display: none;
+        }
+
+        .error-msg.show {
+            display: block;
+        }
+
+        /* ===== FORM BUTTONS ===== */
+        .form-buttons {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            font-family: inherit;
+            text-decoration: none;
+        }
+
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: white;
+            box-shadow: 0 4px 12px rgba(124,58,237,0.35);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #6d28d9, #5b21b6);
+            box-shadow: 0 6px 16px rgba(124,58,237,0.45);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16,185,129,0.35);
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            box-shadow: 0 6px 16px rgba(16,185,129,0.45);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239,68,68,0.35);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            transform: translateY(-1px);
+        }
+
+        .btn-ghost {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-dim);
+            border: 1.5px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--text);
+            border-color: var(--text-dim);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-accent2 {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: white;
+        }
+
+        .btn-accent2:hover {
+            background: linear-gradient(135deg, #0891b2, #0e7490);
+            transform: translateY(-1px);
+        }
+
+        /* ===== RIGHT CONTENT ===== */
+        .right-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ===== TABS ===== */
+        .tabs-header {
+            display: flex;
+            background: var(--sidebar);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            padding: 14px 18px;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.04);
+            border-radius: 6px 6px 0 0;
+        }
+
+        .tab-btn.active {
+            color: #a5b4fc;
+            border-bottom-color: var(--accent);
+            background: rgba(124,58,237,0.08);
+            border-radius: 6px 6px 0 0;
+        }
+
+        .tab-badge {
+            background: var(--danger);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .tab-badge.green { background: var(--success); }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* ===== CALENDAR TAB ===== */
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .calendar-nav-center {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .week-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            min-width: 220px;
+            text-align: center;
+        }
+
+        .calendar-legend {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+
+        .calendar-wrapper {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: 70px repeat(7, minmax(130px, 1fr));
+            min-width: 1000px;
+            position: relative;
+        }
+
+        .cal-header-cell {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            padding: 10px 8px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .cal-header-cell.time-header {
+            background: var(--sidebar);
+        }
+
+        .cal-header-cell.today-header {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+        }
+
+        .cal-day-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .cal-day-date {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            margin-top: 3px;
+        }
+
+        .cal-day-date.today-date {
+            color: white;
+        }
+
+        .today-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-top: 3px;
+        }
+
+        .cal-time-slot {
+            display: contents;
+        }
+
+        .cal-time-cell {
+            background: var(--sidebar);
+            border: 1px solid var(--border);
+            padding: 0 8px;
+            display: flex;
+            align-items: flex-start;
+            padding-top: 6px;
+            min-height: 60px;
+        }
+
+        .cal-time-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .cal-day-cell {
+            background: var(--card);
+            border: 1px solid var(--border);
+            min-height: 60px;
+            position: relative;
+            transition: background 0.15s;
+        }
+
+        .cal-day-cell:hover {
+            background: var(--card2);
+        }
+
+        .cal-day-cell.today-col {
+            background: rgba(124,58,237,0.05);
+            border-color: rgba(124,58,237,0.2);
+        }
+
+        /* ===== PROJECT BLOCKS ===== */
+        .project-block {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 5;
+        }
+
+        .project-block:hover {
+            transform: scale(1.02);
+            z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+
+        .project-block-header {
+            padding: 3px 6px;
+            font-size: 9px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 0.5px;
+        }
+
+        .project-block-body {
+            padding: 2px 6px 4px;
+        }
+
+        .project-block-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-block-detail {
+            font-size: 9px;
+            color: rgba(255,255,255,0.8);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .conflict-indicator {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            width: 8px;
+            height: 8px;
+            background: var(--warning);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+
+        /* Current time line */
+        .current-time-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--danger);
+            z-index: 8;
+            pointer-events: none;
+        }
+
+        .current-time-dot {
+            position: absolute;
+            left: -4px;
+            top: -4px;
+            width: 10px;
+            height: 10px;
+            background: var(--danger);
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(239,68,68,0.6);
+        }
+
+        /* ===== PROJECT LIST TAB ===== */
+        .list-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .list-toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .list-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            background: var(--input-bg);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px 8px 34px;
+            color: var(--text);
+            font-size: 13px;
+            width: 220px;
+            outline: none;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
+        .filter-select {
+            background: var(--input-bg);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-select:focus {
+            border-color: var(--accent);
+        }
+
+        .filter-select option {
+            background: var(--card);
+        }
+
+        .table-container {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            background: var(--card2);
+            color: var(--text-dim);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .data-table th:hover {
+            color: var(--text);
+            background: var(--border);
+        }
+
+        .data-table th.sort-asc::after { content: ' ↑'; color: var(--accent); }
+        .data-table th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+
+        .data-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+            vertical-align: middle;
+            transition: background 0.15s;
+        }
+
+        .data-table tr:hover td {
+            background: var(--card2);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr.conflict-row td {
+            background: rgba(239,68,68,0.08);
+            border-bottom-color: rgba(239,68,68,0.2);
+        }
+
+        .data-table tr.conflict-row:hover td {
+            background: rgba(239,68,68,0.12);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: rgba(16,185,129,0.15);
+            color: #34d399;
+            border: 1px solid rgba(16,185,129,0.3);
+        }
+
+        .status-conflict {
+            background: rgba(239,68,68,0.15);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.3);
+        }
+
+        .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px 8px;
+            border-radius: 6px;
+            color: var(--text-dim);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .action-btn.del:hover {
+            background: rgba(239,68,68,0.15);
+            color: var(--danger);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+        }
+
+        /* ===== CONFLICT TAB ===== */
+        .conflict-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .conflict-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .summary-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .summary-icon.green { background: rgba(16,185,129,0.15); }
+        .summary-icon.red { background: rgba(239,68,68,0.15); }
+        .summary-icon.yellow { background: rgba(245,158,11,0.15); }
+        .summary-icon.blue { background: rgba(6,182,212,0.15); }
+
+        .summary-info h3 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .summary-info p {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 3px;
+        }
+
+        .conflict-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .conflict-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .conflict-card:hover {
+            border-color: var(--warning);
+            box-shadow: 0 4px 20px rgba(245,158,11,0.1);
+        }
+
+        .conflict-card-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .conflict-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .conflict-equipment {
+            background: rgba(239,68,68,0.15);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.3);
+        }
+
+        .conflict-pic {
+            background: rgba(245,158,11,0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245,158,11,0.3);
+        }
+
+        .conflict-resource {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .conflict-time-overlap {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .conflict-card-body {
+            padding: 12px 16px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .conflict-project {
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        .conflict-project-pjm {
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            opacity: 0.9;
+            margin-bottom: 3px;
+        }
+
+        .conflict-project-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 4px;
+        }
+
+        .conflict-project-time {
+            font-size: 11px;
+            color: rgba(255,255,255,0.75);
+        }
+
+        .conflict-vs {
+            text-align: center;
+            color: var(--warning);
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .no-conflict {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .no-conflict-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .no-conflict-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 8px;
+        }
+
+        .no-conflict-desc {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .modal {
+            background: var(--sidebar);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 550px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+            animation: slideUp 0.2s ease;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .modal-subtitle {
+            font-size: 13px;
+            color: rgba(255,255,255,0.75);
+            margin-top: 2px;
+        }
+
+        .modal-close {
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .modal-body {
+            padding: 20px 24px;
+        }
+
+        .detail-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--card);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            align-items: start;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-top: 2px;
+        }
+
+        .detail-value {
+            font-size: 13px;
+            color: var(--text);
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* ===== CONFLICT WARNING MODAL ===== */
+        .conflict-warning {
+            background: rgba(245,158,11,0.1);
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .conflict-warning-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--warning);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .conflict-warning-item {
+            font-size: 12px;
+            color: #fbbf24;
+            margin-bottom: 4px;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .conflict-warning-item::before {
+            content: '•';
+            position: absolute;
+            left: 4px;
+        }
+
+        /* ===== TOAST ===== */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            min-width: 280px;
+            max-width: 350px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            animation: toastIn 0.3s ease;
+            pointer-events: auto;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(40px); }
+        }
+
+        .toast.removing {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        .toast-icon { font-size: 18px; }
+        .toast-content { flex: 1; }
+        .toast-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 2px;
+        }
+        .toast-msg { font-size: 12px; color: var(--text-dim); }
+
+        .toast-success { border-left: 3px solid var(--success); }
+        .toast-error { border-left: 3px solid var(--danger); }
+        .toast-warning { border-left: 3px solid var(--warning); }
+        .toast-info { border-left: 3px solid var(--accent2); }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 900px) {
+            body { overflow: auto; height: auto; }
+            .main-container { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; }
+            .right-content { min-height: 600px; }
+            .header-stats { display: none; }
+        }
+
+        /* ===== LOADING ===== */
+        .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== CHECKBOX ===== */
+        .checkbox-cell input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* ===== TOOLTIP ===== */
+        [data-tooltip] {
+            position: relative;
+        }
+
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            z-index: 100;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+    <div class="header-left">
+        <div class="header-logo">
+            <div class="logo-icon">⚙</div>
+            <div>
+                <div class="header-title">PJM Build Plan</div>
+                <div class="header-subtitle">Project Management System</div>
+            </div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="header-stats">
+            <div class="stat-badge">
+                <span>📋 Total:</span>
+                <span class="stat-num" id="stat-total">0</span>
+            </div>
+            <div class="stat-badge">
+                <span>✅ Active:</span>
+                <span class="stat-num" id="stat-active">0</span>
+            </div>
+            <div class="stat-badge">
+                <span>⚠ Conflicts:</span>
+                <span class="stat-num" id="stat-conflicts" style="color:#f87171">0</span>
+            </div>
+        </div>
+        <div class="current-date" id="current-date"></div>
+    </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<div class="main-container">
+
+    <!-- ===== SIDEBAR FORM ===== -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span style="font-size:18px">➕</span>
+            <h2>Add New Build Plan</h2>
+        </div>
+
+        <div class="form-scroll">
+            <form id="project-form" novalidate>
+
+                <!-- Project Info -->
+                <div class="section-divider">
+                    <span class="section-label">📋 Project Info</span>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">PJM Number <span class="field-required">*</span></label>
+                    <input type="text" class="form-input" id="f-pjm" placeholder="e.g., PJM-2024-001">
+                    <div class="error-msg" id="err-pjm">PJM Number is required</div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Project Title <span class="field-required">*</span></label>
+                    <input type="text" class="form-input" id="f-title" placeholder="Enter project title">
+                    <div class="error-msg" id="err-title">Project Title is required</div>
+                </div>
+
+                <!-- Equipment & Personnel -->
+                <div class="section-divider">
+                    <span class="section-label">🔧 Equipment & Personnel</span>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Equipment <span class="field-required">*</span></label>
+                    <select class="form-select" id="f-equipment">
+                        <option value="">-- Select Equipment --</option>
+                        <option>Equipment A - Machine 01</option>
+                        <option>Equipment B - Machine 02</option>
+                        <option>Equipment C - Machine 03</option>
+                        <option>Equipment D - Analyzer 01</option>
+                        <option>Equipment E - Analyzer 02</option>
+                        <option>Equipment F - Tester 01</option>
+                        <option>Equipment G - Tester 02</option>
+                        <option>Equipment H - Scanner 01</option>
+                    </select>
+                    <div class="error-msg" id="err-equipment">Equipment is required</div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Person in Charge (PIC) <span class="field-required">*</span></label>
+                    <select class="form-select" id="f-pic">
+                        <option value="">-- Select PIC --</option>
+                        <option>Ahmad Rizki</option>
+                        <option>Budi Santoso</option>
+                        <option>Citra Dewi</option>
+                        <option>Dian Pratama</option>
+                        <option>Eka Susanti</option>
+                        <option>Fajar Nugraha</option>
+                        <option>Gita Rahayu</option>
+                        <option>Hendra Wijaya</option>
+                    </select>
+                    <div class="error-msg" id="err-pic">PIC is required</div>
+                </div>
+
+                <!-- Schedule -->
+                <div class="section-divider">
+                    <span class="section-label">📅 Schedule</span>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Start Date & Time <span class="field-required">*</span></label>
+                    <div class="date-time-group">
+                        <input type="date" class="form-input" id="f-start-date">
+                        <select class="form-select time-select" id="f-start-time"></select>
+                    </div>
+                    <div class="error-msg" id="err-start">Start date is required</div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">End Date & Time <span class="field-required">*</span></label>
+                    <div class="date-time-group">
+                        <input type="date" class="form-input" id="f-end-date">
+                        <select class="form-select time-select" id="f-end-time"></select>
+                    </div>
+                    <div class="error-msg" id="err-end">End date is required</div>
+                </div>
+
+                <!-- Sample Info -->
+                <div class="section-divider">
+                    <span class="section-label">🧪 Sample Information</span>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Sample Quantity <span class="field-required">*</span></label>
+                    <input type="number" class="form-input" id="f-qty" placeholder="e.g., 100" min="1">
+                    <div class="error-msg" id="err-qty">Sample Quantity is required</div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Sample Lot <span class="field-required">*</span></label>
+                    <input type="text" class="form-input" id="f-lot" placeholder="e.g., LOT-2024-001">
+                    <div class="error-msg" id="err-lot">Sample Lot is required</div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Notes (Optional)</label>
+                    <textarea class="form-textarea" id="f-notes" placeholder="Additional notes..."></textarea>
+                </div>
+
+            </form>
+        </div>
+
+        <div class="form-buttons">
+            <button class="btn btn-success" onclick="saveProject()" id="save-btn">
+                <span>💾</span> Save Project
+            </button>
+            <button class="btn btn-ghost" onclick="clearForm()">
+                <span>🔄</span> Clear Form
+            </button>
+        </div>
+    </aside>
+
+    <!-- ===== RIGHT CONTENT ===== -->
+    <div class="right-content">
+
+        <!-- Tabs -->
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchTab('calendar')" id="tab-calendar">
+                📅 Weekly Calendar
+            </button>
+            <button class="tab-btn" onclick="switchTab('list')" id="tab-list">
+                📋 Project List
+            </button>
+            <button class="tab-btn" onclick="switchTab('conflicts')" id="tab-conflicts">
+                ⚠ Conflicts <span class="tab-badge" id="conflict-badge">0</span>
+            </button>
+        </div>
+
+        <!-- ===== CALENDAR TAB ===== -->
+        <div class="tab-content active" id="tab-content-calendar">
+            <div class="calendar-nav">
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-ghost btn-sm" onclick="prevWeek()">◀ Prev</button>
+                    <button class="btn btn-accent2 btn-sm" onclick="goToToday()">Today</button>
+                    <button class="btn btn-ghost btn-sm" onclick="nextWeek()">Next ▶</button>
+                </div>
+                <div class="calendar-nav-center">
+                    <div class="week-label" id="week-label">Loading...</div>
+                </div>
+                <div class="calendar-legend" id="calendar-legend"></div>
+            </div>
+
+            <div class="calendar-wrapper">
+                <div class="calendar-grid" id="calendar-grid"></div>
+            </div>
+        </div>
+
+        <!-- ===== LIST TAB ===== -->
+        <div class="tab-content" id="tab-content-list">
+            <div class="list-toolbar">
+                <div class="list-toolbar-left">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="search-input" placeholder="Search projects..." oninput="filterProjects()">
+                    </div>
+                    <select class="filter-select" id="filter-status" onchange="filterProjects()">
+                        <option value="">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Conflict">Conflict</option>
+                    </select>
+                    <select class="filter-select" id="filter-equipment" onchange="filterProjects()">
+                        <option value="">All Equipment</option>
+                    </select>
+                    <select class="filter-select" id="filter-pic" onchange="filterProjects()">
+                        <option value="">All PIC</option>
+                    </select>
+                </div>
+                <div class="list-toolbar-right">
+                    <span id="selected-count" style="font-size:12px;color:var(--text-dim)"></span>
+                    <button class="btn btn-danger btn-sm" onclick="deleteSelected()">🗑 Delete Selected</button>
+                    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📤 Export CSV</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="project-table">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell" style="width:40px">
+                                <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                            </th>
+                            <th onclick="sortTable('pjm')" data-col="pjm">#</th>
+                            <th onclick="sortTable('pjm')" data-col="pjm">PJM Number</th>
+                            <th onclick="sortTable('title')" data-col="title">Project Title</th>
+                            <th onclick="sortTable('equipment')" data-col="equipment">Equipment</th>
+                            <th onclick="sortTable('pic')" data-col="pic">PIC</th>
+                            <th onclick="sortTable('start')" data-col="start">Start</th>
+                            <th onclick="sortTable('end')" data-col="end">End</th>
+                            <th onclick="sortTable('qty')" data-col="qty">Qty</th>
+                            <th onclick="sortTable('lot')" data-col="lot">Sample Lot</th>
+                            <th onclick="sortTable('status')" data-col="status">Status</th>
+                            <th style="width:80px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="project-tbody"></tbody>
+                </table>
+                <div class="empty-state" id="empty-state" style="display:none">
+                    <div class="empty-icon">📋</div>
+                    <div class="empty-title">No Projects Found</div>
+                    <div class="empty-desc">Add a new project using the form on the left</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CONFLICTS TAB ===== -->
+        <div class="tab-content" id="tab-content-conflicts">
+            <div class="conflict-container" id="conflict-container"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ===== DETAIL MODAL ===== -->
+<div class="modal-overlay" id="detail-modal">
+    <div class="modal">
+        <div class="modal-header" id="modal-header">
+            <div>
+                <div class="modal-title" id="modal-title"></div>
+                <div class="modal-subtitle" id="modal-subtitle"></div>
+            </div>
+            <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+    </div>
+</div>
+
+<!-- ===== CONFLICT WARNING MODAL ===== -->
+<div class="modal-overlay" id="conflict-modal">
+    <div class="modal">
+        <div class="modal-header" style="background: linear-gradient(135deg, #92400e, #78350f)">
+            <div>
+                <div class="modal-title">⚠ Conflict Detected</div>
+                <div class="modal-subtitle">The following conflicts were found</div>
+            </div>
+            <button class="modal-close" onclick="closeModal('conflict-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="conflict-modal-content"></div>
+            <p style="font-size:13px;color:var(--text-dim);margin-top:12px">
+                Do you want to save this project anyway?
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('conflict-modal')">Cancel</button>
+            <button class="btn btn-warning" onclick="forceSave()"
+                style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white">
+                ⚠ Save Anyway
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TOAST CONTAINER ===== -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// =============================================
+// DATA & STATE
+// =============================================
+let projects = [];
+let currentWeekStart = getWeekStart(new Date());
+let sortConfig = { col: 'start', dir: 'asc' };
+let pendingProjectData = null;
+let editingId = null;
+let rowCounter = 1;
+
+const PROJECT_COLORS = [
+    '#7c3aed','#06b6d4','#10b981','#f59e0b',
+    '#ef4444','#8b5cf6','#0ea5e9','#14b8a6',
+    '#f97316','#ec4899','#6366f1','#84cc16',
+    '#3b82f6','#a855f7','#22c55e','#eab308'
+];
+
+// =============================================
+// INIT
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    initTimeSelects();
+    setDefaultDates();
+    updateCurrentDate();
+    renderCalendar();
+    renderConflicts();
+    updateStats();
+
+    // Update clock every minute
+    setInterval(updateCurrentDate, 60000);
+    setInterval(() => {
+        updateCurrentTimeLine();
+    }, 60000);
+
+    // Load demo data
+    loadDemoData();
+});
+
+function loadDemoData() {
+    const today = new Date();
+    const fmt = d => d.toISOString().split('T')[0];
+
+    const demos = [
+        {
+            pjm: 'PJM-2024-001', title: 'Motor Assembly Test',
+            equipment: 'Equipment A - Machine 01', pic: 'Ahmad Rizki',
+            startDate: fmt(today), startTime: '08:00',
+            endDate: fmt(today), endTime: '12:00',
+            qty: '50', lot: 'LOT-2024-001', notes: 'Initial motor test run'
+        },
+        {
+            pjm: 'PJM-2024-002', title: 'Circuit Board Analysis',
+            equipment: 'Equipment D - Analyzer 01', pic: 'Budi Santoso',
+            startDate: fmt(today), startTime: '13:00',
+            endDate: fmt(new Date(today.getTime() + 86400000)), endTime: '17:00',
+            qty: '30', lot: 'LOT-2024-002', notes: 'PCB inspection batch 1'
+        },
+        {
+            pjm: 'PJM-2024-003', title: 'Quality Control Scan',
+            equipment: 'Equipment H - Scanner 01', pic: 'Citra Dewi',
+            startDate: fmt(new Date(today.getTime() + 86400000)), startTime: '09:00',
+            endDate: fmt(new Date(today.getTime() + 2*86400000)), endTime: '16:00',
+            qty: '100', lot: 'LOT-2024-003', notes: 'Weekly QC scan'
+        },
+        {
+            pjm: 'PJM-2024-004', title: 'Thermal Testing',
+            equipment: 'Equipment C - Machine 03', pic: 'Dian Pratama',
+            startDate: fmt(new Date(today.getTime() + 2*86400000)), startTime: '10:00',
+            endDate: fmt(new Date(today.getTime() + 3*86400000)), endTime: '15:00',
+            qty: '25', lot: 'LOT-2024-004', notes: ''
+        }
+    ];
+
+    demos.forEach((d, i) => {
+        const project = buildProject(d, i);
+        projects.push(project);
+    });
+
+    refreshAll();
+}
+
+// =============================================
+// TIME SELECTS
+// =============================================
+function initTimeSelects() {
+    const times = [];
+    for (let h = 0; h < 24; h++) {
+        for (let m of [0, 30]) {
+            times.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+        }
+    }
+
+    ['f-start-time','f-end-time'].forEach((id, idx) => {
+        const sel = document.getElementById(id);
+        times.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            sel.appendChild(opt);
+        });
+        sel.value = idx === 0 ? '08:00' : '17:00';
+    });
+}
+
+function setDefaultDates() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('f-start-date').value = today;
+    document.getElementById('f-end-date').value = today;
+}
+
+// =============================================
+// VALIDATION & SAVE
+// =============================================
+function validateForm() {
+    let valid = true;
+    const fields = [
+        { id: 'f-pjm', err: 'err-pjm', msg: 'PJM Number is required' },
+        { id: 'f-title', err: 'err-title', msg: 'Project Title is required' },
+        { id: 'f-equipment', err: 'err-equipment', msg: 'Equipment is required' },
+        { id: 'f-pic', err: 'err-pic', msg: 'PIC is required' },
+        { id: 'f-start-date', err: 'err-start', msg: 'Start date is required' },
+        { id: 'f-end-date', err: 'err-end', msg: 'End date is required' },
+        { id: 'f-qty', err: 'err-qty', msg: 'Sample Quantity is required' },
+        { id: 'f-lot', err: 'err-lot', msg: 'Sample Lot is required' },
+    ];
+
+    fields.forEach(f => {
+        const el = document.getElementById(f.id);
+        const err = document.getElementById(f.err);
+        if (!el.value.trim()) {
+            el.classList.add('error');
+            err.textContent = f.msg;
+            err.classList.add('show');
+            valid = false;
+        } else {
+            el.classList.remove('error');
+            err.classList.remove('show');
+        }
+    });
+
+    return valid;
+}
+
+function saveProject() {
+    if (!validateForm()) {
+        showToast('error', 'Validation Error', 'Please fill all required fields');
+        return;
+    }
+
+    const data = getFormData();
+
+    // Validate dates
+    if (data.startDt >= data.endDt) {
+        showToast('error', 'Date Error', 'End date/time must be after start date/time');
+        document.getElementById('f-end-date').classList.add('error');
+        return;
+    }
+
+    // Duplicate PJM check
+    const dupPjm = projects.find(p => p.pjm === data.pjm && p.id !== editingId);
+    if (dupPjm) {
+        showToast('error', 'Duplicate PJM', `PJM Number "${data.pjm}" already exists!`);
+        document.getElementById('f-pjm').classList.add('error');
+        return;
+    }
+
+    // Conflict check
+    const conflicts = checkConflicts(data.equipment, data.pic, data.startDt, data.endDt, editingId);
+
+    if (conflicts.length > 0) {
+        pendingProjectData = data;
+        showConflictModal(conflicts);
+        return;
+    }
+
+    commitSave(data);
+}
+
+function getFormData() {
+    const startDate = document.getElementById('f-start-date').value;
+    const startTime = document.getElementById('f-start-time').value;
+    const endDate = document.getElementById('f-end-date').value;
+    const endTime = document.getElementById('f-end-time').value;
+
+    return {
+        pjm: document.getElementById('f-pjm').value.trim(),
+        title: document.getElementById('f-title').value.trim(),
+        equipment: document.getElementById('f-equipment').value,
+        pic: document.getElementById('f-pic').value,
+        startDate, startTime,
+        endDate, endTime,
+        startDt: new Date(`${startDate}T${startTime}`),
+        endDt: new Date(`${endDate}T${endTime}`),
+        qty: document.getElementById('f-qty').value.trim(),
+        lot: document.getElementById('f-lot').value.trim(),
+        notes: document.getElementById('f-notes').value.trim(),
+    };
+}
+
+function buildProject(data, colorIdx) {
+    const startDt = new Date(`${data.startDate}T${data.startTime}`);
+    const endDt = new Date(`${data.endDate}T${data.endTime}`);
+    return {
+        id: editingId || `proj_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+        pjm: data.pjm,
+        title: data.title,
+        equipment: data.equipment,
+        pic: data.pic,
+        startDate: data.startDate,
+        startTime: data.startTime,
+        endDate: data.endDate,
+        endTime: data.endTime,
+        startDt,
+        endDt,
+        qty: data.qty,
+        lot: data.lot,
+        notes: data.notes,
+        color: PROJECT_COLORS[colorIdx % PROJECT_COLORS.length],
+        rowNum: rowCounter++,
+    };
+}
+
+function commitSave(data) {
+    const colorIdx = editingId
+        ? projects.findIndex(p => p.id === editingId)
+        : projects.length;
+
+    const project = {
+        id: editingId || `proj_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+        pjm: data.pjm,
+        title: data.title,
+        equipment: data.equipment,
+        pic: data.pic,
+        startDate: data.startDate,
+        startTime: data.startTime,
+        endDate: data.endDate,
+        endTime: data.endTime,
+        startDt: data.startDt,
+        endDt: data.endDt,
+        qty: data.qty,
+        lot: data.lot,
+        notes: data.notes,
+        color: PROJECT_COLORS[colorIdx % PROJECT_COLORS.length],
+        rowNum: editingId
+            ? (projects.find(p => p.id === editingId)?.rowNum || rowCounter++)
+            : rowCounter++,
+    };
+
+    if (editingId) {
+        const idx = projects.findIndex(p => p.id === editingId);
+        projects[idx] = project;
+        showToast('success', 'Project Updated', `${project.pjm} has been updated`);
+        editingId = null;
+    } else {
+        projects.push(project);
+        showToast('success', 'Project Saved!', `${project.pjm} added successfully`);
+    }
+
+    closeModal('conflict-modal');
+    clearForm();
+    refreshAll();
+
+    // Navigate calendar to project week
+    currentWeekStart = getWeekStart(data.startDt);
+    renderCalendar();
+    switchTab('calendar');
+}
+
+function forceSave() {
+    if (pendingProjectData) {
+        commitSave(pendingProjectData);
+        pendingProjectData = null;
+    }
+}
+
+function clearForm() {
+    document.getElementById('project-form').reset();
+    setDefaultDates();
+    document.getElementById('f-start-time').value = '08:00';
+    document.getElementById('f-end-time').value = '17:00';
+    editingId = null;
+    document.getElementById('save-btn').innerHTML = '<span>💾</span> Save Project';
+
+    // Clear errors
+    document.querySelectorAll('.form-input,.form-select').forEach(el => {
+        el.classList.remove('error');
+    });
+    document.querySelectorAll('.error-msg').forEach(el => {
+        el.classList.remove('show');
+    });
+}
+
+// =============================================
+// CONFLICT DETECTION
+// =============================================
+function checkConflicts(equipment, pic, startDt, endDt, excludeId = null) {
+    const conflicts = [];
+
+    projects.forEach(p => {
+        if (p.id === excludeId) return;
+
+        if (startDt < p.endDt && endDt > p.startDt) {
+            if (p.equipment === equipment) {
+                conflicts.push({
+                    type: 'Equipment',
+                    resource: equipment,
+                    conflictWith: p,
+                });
+            }
+            if (p.pic === pic) {
+                conflicts.push({
+                    type: 'PIC',
+                    resource: pic,
+                    conflictWith: p,
+                });
+            }
+        }
+    });
+
+    return conflicts;
+}
+
+function getAllConflicts() {
+    const found = [];
+    for (let i = 0; i < projects.length; i++) {
+        for (let j = i + 1; j < projects.length; j++) {
+            const a = projects[i], b = projects[j];
+            if (a.startDt < b.endDt && a.endDt > b.startDt) {
+                if (a.equipment === b.equipment) {
+                    found.push({ type: 'Equipment', resource: a.equipment, proj1: a, proj2: b });
+                }
+                if (a.pic === b.pic) {
+                    found.push({ type: 'PIC', resource: a.pic, proj1: a, proj2: b });
+                }
+            }
+        }
+    }
+    return found;
+}
+
+function hasConflict(project) {
+    return projects.some(p => {
+        if (p.id === project.id) return false;
+        if (project.startDt < p.endDt && project.endDt > p.startDt) {
+            return p.equipment === project.equipment || p.pic === project.pic;
+        }
+        return false;
+    });
+}
+
+// =============================================
+// CALENDAR
+// =============================================
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = (day === 0) ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function prevWeek() {
+    currentWeekStart = new Date(currentWeekStart.getTime() - 7 * 86400000);
+    renderCalendar();
+}
+
+function nextWeek() {
+    currentWeekStart = new Date(currentWeekStart.getTime() + 7 * 86400000);
+    renderCalendar();
+}
+
+function goToToday() {
+    currentWeekStart = getWeekStart(new Date());
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = '';
+
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const hours = [];
+    for (let h = 7; h <= 21; h++) hours.push(h);
+
+    const weekEnd = new Date(currentWeekStart.getTime() + 6 * 86400000);
+    const fmt = d => d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
+    document.getElementById('week-label').textContent =
+        `${fmt(currentWeekStart)} – ${fmt(weekEnd)} ${weekEnd.getFullYear()}`;
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Header row
+    const timeHeader = document.createElement('div');
+    timeHeader.className = 'cal-header-cell time-header';
+    grid.appendChild(timeHeader);
+
+    const dayDates = [];
+    days.forEach((day, i) => {
+        const dayDate = new Date(currentWeekStart.getTime() + i * 86400000);
+        dayDates.push(dayDate);
+        const isToday = dayDate.getTime() === today.getTime();
+
+        const cell = document.createElement('div');
+        cell.className = 'cal-header-cell' + (isToday ? ' today-header' : '');
+        cell.innerHTML = `
+            <div class="cal-day-name">${day.substring(0,3)}</div>
+            <div class="cal-day-date${isToday ? ' today-date' : ''}">${dayDate.toLocaleDateString('en-GB', {day:'2-digit', month:'short'})}</div>
+            ${isToday ? '<span class="today-badge">TODAY</span>' : ''}
+        `;
+        grid.appendChild(cell);
+    });
+
+    // Time rows
+    const SLOT_HEIGHT = 60; // px per hour
+
+    hours.forEach(hour => {
+        const timeCell = document.createElement('div');
+        timeCell.className = 'cal-time-cell';
+        timeCell.innerHTML = `<span class="cal-time-label">${String(hour).padStart(2,'0')}:00</span>`;
+        grid.appendChild(timeCell);
+
+        days.forEach((_, i) => {
+            const dayDate = dayDates[i];
+            const isToday = dayDate.getTime() === today.getTime();
+
+            const cell = document.createElement('div');
+            cell.className = 'cal-day-cell' + (isToday ? ' today-col' : '');
+            cell.style.height = SLOT_HEIGHT + 'px';
+            cell.dataset.day = i;
+            cell.dataset.hour = hour;
+            grid.appendChild(cell);
+        });
+    });
+
+    // Draw projects
+    placeProjectBlocks(dayDates, hours, SLOT_HEIGHT);
+
+    // Current time line
+    updateCurrentTimeLine();
+    renderCalendarLegend();
+}
+
+function placeProjectBlocks(dayDates, hours, SLOT_HEIGHT) {
+    const startHour = hours[0];
+
+    dayDates.forEach((dayDate, dayIdx) => {
+        const dayStart = new Date(dayDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart.getTime() + 86400000);
+
+        // Find projects for this day
+        const dayProjects = projects.filter(p =>
+            p.startDt < dayEnd && p.endDt > dayStart
+        );
+
+        if (dayProjects.length === 0) return;
+
+        // Compute overlap columns
+        const columns = assignColumns(dayProjects);
+
+        dayProjects.forEach(project => {
+            const segStart = project.startDt < dayStart ? dayStart : project.startDt;
+            const segEnd = project.endDt > dayEnd ? dayEnd : project.endDt;
+
+            const startH = segStart.getHours() + segStart.getMinutes() / 60;
+            const endH = segEnd.getHours() + segEnd.getMinutes() / 60;
+
+            const visStart = Math.max(startH, startHour);
+            const visEnd = Math.min(endH, hours[hours.length - 1] + 1);
+
+            if (visStart >= visEnd) return;
+
+            const topPx = (visStart - startHour) * SLOT_HEIGHT;
+            const heightPx = Math.max((visEnd - visStart) * SLOT_HEIGHT - 3, 20);
+
+            const { col, totalCols } = columns[project.id];
+            const widthPct = 100 / totalCols;
+            const leftPct = col * widthPct;
+
+            const isConflict = hasConflict(project);
+
+            const block = document.createElement('div');
+            block.className = 'project-block';
+            block.style.cssText = `
+                top: ${topPx}px;
+                height: ${heightPx}px;
+                left: calc(${leftPct}% + 2px);
+                width: calc(${widthPct}% - 4px);
+                background: ${project.color};
+                background: linear-gradient(160deg, ${project.color}ee, ${darkenColor(project.color)}cc);
+            `;
+
+            // Block content
+            const durationH = Math.round((segEnd - segStart) / 3600000 * 10) / 10;
+            block.innerHTML = `
+                <div class="project-block-header" style="background:${darkenColor(project.color)}">
+                    ${project.pjm}
+                </div>
+                <div class="project-block-body">
+                    ${heightPx > 40 ? `<div class="project-block-title">${truncate(project.title, 18)}</div>` : ''}
+                    ${heightPx > 60 ? `<div class="project-block-detail">⚙ ${truncate(project.equipment.split(' - ')[0], 15)}</div>` : ''}
+                    ${heightPx > 80 ? `<div class="project-block-detail">👤 ${project.pic.split(' ')[0]}</div>` : ''}
+                    ${heightPx > 100 ? `<div class="project-block-detail">⏱ ${durationH}h</div>` : ''}
+                </div>
+                ${isConflict ? '<div class="conflict-indicator" title="Conflict!"></div>' : ''}
+            `;
+
+            block.addEventListener('click', () => showProjectDetail(project.id));
+
+            // Find the correct cell to append to
+            // We overlay projects over the grid cells using absolute positioning
+            // Let's append to the calendar wrapper with absolute pos
+            const calWrapper = document.querySelector('.calendar-wrapper');
+
+            // Calculate absolute position in the wrapper
+            const gridEl = document.getElementById('calendar-grid');
+            const headerHeight = 65; // approximate header height
+            const timeColWidth = 70;
+            const gridRect = gridEl.getBoundingClientRect();
+
+            // Use grid column approach - place in the cell container
+            // We need to find the cells for this day column and put blocks there
+            // Better: use a positioned overlay per day column
+
+            // Actually let's place directly in the appropriate cells
+            // Find all cells for this day
+            const cell = gridEl.querySelector(
+                `.cal-day-cell[data-day="${dayIdx}"][data-hour="${hours[0]}"]`
+            );
+
+            if (cell) {
+                // Use the parent grid and position relative to it
+                // Create an overlay container for the day column if not exists
+                let dayOverlay = gridEl.querySelector(`.day-overlay[data-day="${dayIdx}"]`);
+                if (!dayOverlay) {
+                    dayOverlay = document.createElement('div');
+                    dayOverlay.className = 'day-overlay';
+                    dayOverlay.dataset.day = dayIdx;
+                    dayOverlay.style.cssText = `
+                        position: absolute;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        pointer-events: none;
+                    `;
+                }
+
+                // Append block to the correct cells
+                // Since the grid uses CSS grid, let's append to the first cell of that hour
+                const hourCell = gridEl.querySelector(
+                    `.cal-day-cell[data-day="${dayIdx}"][data-hour="${Math.floor(visStart)}"]`
+                );
+
+                if (hourCell) {
+                    hourCell.style.position = 'relative';
+                    hourCell.style.overflow = 'visible';
+                    hourCell.appendChild(block);
+
+                    // Adjust top relative to hourCell
+                    const cellHour = parseInt(hourCell.dataset.hour);
+                    const relTop = (visStart - cellHour) * SLOT_HEIGHT;
+                    block.style.top = relTop + 'px';
+                    block.style.position = 'absolute';
+                }
+            }
+        });
+    });
+}
+
+function assignColumns(dayProjects) {
+    const columns = {};
+    const sorted = [...dayProjects].sort((a, b) => a.startDt - b.startDt);
+
+    sorted.forEach(project => {
+        const overlapping = sorted.filter(other =>
+            other.id !== project.id &&
+            project.startDt < other.endDt &&
+            project.endDt > other.startDt
+        );
+
+        // Find first available column
+        const usedCols = overlapping
+            .filter(o => columns[o.id] !== undefined)
+            .map(o => columns[o.id].col);
+
+        let col = 0;
+        while (usedCols.includes(col)) col++;
+        columns[project.id] = { col, totalCols: 1 };
+    });
+
+    // Recalculate total columns
+    sorted.forEach(project => {
+        const overlapping = sorted.filter(other =>
+            project.startDt < other.endDt &&
+            project.endDt > other.startDt
+        );
+        const maxCol = Math.max(...overlapping.map(o => columns[o.id]?.col ?? 0));
+        const totalCols = maxCol + 1;
+        overlapping.forEach(o => {
+            if (columns[o.id]) columns[o.id].totalCols = totalCols;
+        });
+    });
+
+    return columns;
+}
+
+function updateCurrentTimeLine() {
+    document.querySelectorAll('.current-time-line').forEach(el => el.remove());
+
+    const now = new Date();
+    const weekEnd = new Date(currentWeekStart.getTime() + 7 * 86400000);
+
+    if (now < currentWeekStart || now >= weekEnd) return;
+
+    const dayIdx = (now.getDay() === 0) ? 6 : now.getDay() - 1;
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    const startHour = 7;
+
+    if (currentHour < startHour || currentHour > 22) return;
+
+    const SLOT_HEIGHT = 60;
+    const hourOffset = currentHour - startHour;
+    const posInHour = (currentHour % 1) * SLOT_HEIGHT;
+
+    const grid = document.getElementById('calendar-grid');
+    const targetHour = Math.floor(currentHour);
+    const cell = grid.querySelector(
+        `.cal-day-cell[data-day="${dayIdx}"][data-hour="${targetHour}"]`
+    );
+
+    if (cell) {
+        const line = document.createElement('div');
+        line.className = 'current-time-line';
+        line.style.top = posInHour + 'px';
+        line.innerHTML = '<div class="current-time-dot"></div>';
+        cell.style.position = 'relative';
+        cell.appendChild(line);
+    }
+}
+
+function renderCalendarLegend() {
+    const legend = document.getElementById('calendar-legend');
+    legend.innerHTML = '';
+
+    const shown = projects.slice(0, 5);
+    shown.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+            <div class="legend-dot" style="background:${p.color}"></div>
+            <span>${p.pjm}</span>
+        `;
+        legend.appendChild(item);
+    });
+
+    if (projects.length > 5) {
+        const more = document.createElement('div');
+        more.className = 'legend-item';
+        more.innerHTML = `<span style="color:var(--text-dim)">+${projects.length - 5} more</span>`;
+        legend.appendChild(more);
+    }
+}
+
+// =============================================
+// PROJECT LIST / TABLE
+// =============================================
+function renderTable(data = null) {
+    const tbody = document.getElementById('project-tbody');
+    const empty = document.getElementById('empty-state');
+    const list = data ?? projects;
+
+    tbody.innerHTML = '';
+
+    if (list.length === 0) {
+        empty.style.display = 'block';
+        updateFilters();
+        return;
+    }
+    empty.style.display = 'none';
+
+    // Sort
+    const sorted = [...list].sort((a, b) => {
+        let va = a[sortConfig.col] ?? '';
+        let vb = b[sortConfig.col] ?? '';
+        if (sortConfig.col === 'start' || sortConfig.col === 'end') {
+            va = sortConfig.col === 'start' ? a.startDt : a.endDt;
+            vb = sortConfig.col === 'start' ? b.startDt : b.endDt;
+        }
+        if (va < vb) return sortConfig.dir === 'asc' ? -1 : 1;
+        if (va > vb) return sortConfig.dir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    sorted.forEach(project => {
+        const conflict = hasConflict(project);
+        const tr = document.createElement('tr');
+        tr.className = conflict ? 'conflict-row' : '';
+        tr.dataset.id = project.id;
+
+        const fmtDt = (d, t) => {
+            const dt = new Date(`${d}T${t}`);
+            return dt.toLocaleDateString('en-GB', {
+                day: '2-digit', month: 'short', year: '2-digit'
+            }) + ' ' + t;
+        };
+
+        tr.innerHTML = `
+            <td class="checkbox-cell">
+                <input type="checkbox" data-id="${project.id}" onchange="updateSelectedCount()">
+            </td>
+            <td style="color:var(--text-dim);font-size:11px">${project.rowNum}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <div class="color-dot" style="background:${project.color}"></div>
+                    <span style="font-weight:600">${project.pjm}</span>
+                </div>
+            </td>
+            <td>${project.title}</td>
+            <td style="font-size:12px">${project.equipment}</td>
+            <td>${project.pic}</td>
+            <td style="font-size:12px;white-space:nowrap">${fmtDt(project.startDate, project.startTime)}</td>
+            <td style="font-size:12px;white-space:nowrap">${fmtDt(project.endDate, project.endTime)}</td>
+            <td style="text-align:center">${project.qty}</td>
+            <td style="font-size:12px">${project.lot}</td>
+            <td>
+                <span class="status-badge ${conflict ? 'status-conflict' : 'status-active'}">
+                    ${conflict ? '⚠ Conflict' : '✅ Active'}
+                </span>
+            </td>
+            <td>
+                <button class="action-btn" onclick="showProjectDetail('${project.id}')" data-tooltip="View Details">👁</button>
+                <button class="action-btn" onclick="editProject('${project.id}')" data-tooltip="Edit">✏️</button>
+                <button class="action-btn del" onclick="deleteProject('${project.id}')" data-tooltip="Delete">🗑</button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+
+    updateFilters();
+}
+
+function sortTable(col) {
+    if (sortConfig.col === col) {
+        sortConfig.dir = sortConfig.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortConfig.col = col;
+        sortConfig.dir = 'asc';
+    }
+
+    document.querySelectorAll('.data-table th').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+    });
+
+    const th = document.querySelector(`.data-table th[data-col="${col}"]`);
+    if (th) th.classList.add(sortConfig.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+
+    renderTable();
+}
+
+function filterProjects() {
+    const query = document.getElementById('search-input').value.toLowerCase();
+    const statusFilter = document.getElementById('filter-status').value;
+    const equipFilter = document.getElementById('filter-equipment').value;
+    const picFilter = document.getElementById('filter-pic').value;
+
+    const filtered = projects.filter(p => {
+        const searchStr = `${p.pjm} ${p.title} ${p.equipment} ${p.pic} ${p.lot}`.toLowerCase();
+        const matchSearch = !query || searchStr.includes(query);
+        const matchStatus = !statusFilter ||
+            (statusFilter === 'Conflict' ? hasConflict(p) : !hasConflict(p));
+        const matchEquip = !equipFilter || p.equipment === equipFilter;
+        const matchPic = !picFilter || p.pic === picFilter;
+        return matchSearch && matchStatus && matchEquip && matchPic;
+    });
+
+    renderTable(filtered);
+}
+
+function updateFilters() {
+    const equipSel = document.getElementById('filter-equipment');
+    const picSel = document.getElementById('filter-pic');
+
+    const curEquip = equipSel.value;
+    const curPic = picSel.value;
+
+    const equipments = [...new Set(projects.map(p => p.equipment))].sort();
+    const pics = [...new Set(projects.map(p => p.pic))].sort();
+
+    equipSel.innerHTML = '<option value="">All Equipment</option>' +
+        equipments.map(e => `<option ${e === curEquip ? 'selected' : ''}>${e}</option>`).join('');
+
+    picSel.innerHTML = '<option value="">All PIC</option>' +
+        pics.map(p => `<option ${p === curPic ? 'selected' : ''}>${p}</option>`).join('');
+}
+
+function toggleSelectAll() {
+    const all = document.getElementById('select-all').checked;
+    document.querySelectorAll('#project-tbody input[type="checkbox"]').forEach(cb => {
+        cb.checked = all;
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('#project-tbody input[type="checkbox"]:checked');
+    const countEl = document.getElementById('selected-count');
+    countEl.textContent = selected.length > 0 ? `${selected.length} selected` : '';
+}
+
+function deleteSelected() {
+    const selected = [...document.querySelectorAll('#project-tbody input[type="checkbox"]:checked')];
+    if (selected.length === 0) {
+        showToast('warning', 'No Selection', 'Please select projects to delete');
+        return;
+    }
+
+    if (!confirm(`Delete ${selected.length} selected project(s)?`)) return;
+
+    const ids = selected.map(cb => cb.dataset.id);
+    projects = projects.filter(p => !ids.includes(p.id));
+    refreshAll();
+    showToast('success', 'Deleted', `${ids.length} project(s) removed`);
+}
+
+function deleteProject(id) {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+
+    if (!confirm(`Delete "${project.pjm} - ${project.title}"?`)) return;
+
+    projects = projects.filter(p => p.id !== id);
+    refreshAll();
+    closeModal('detail-modal');
+    showToast('success', 'Deleted', `${project.pjm} has been removed`);
+}
+
+function editProject(id) {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+
+    editingId = id;
+
+    document.getElementById('f-pjm').value = project.pjm;
+    document.getElementById('f-title').value = project.title;
+    document.getElementById('f-equipment').value = project.equipment;
+    document.getElementById('f-pic').value = project.pic;
+    document.getElementById('f-start-date').value = project.startDate;
+    document.getElementById('f-start-time').value = project.startTime;
+    document.getElementById('f-end-date').value = project.endDate;
+    document.getElementById('f-end-time').value = project.endTime;
+    document.getElementById('f-qty').value = project.qty;
+    document.getElementById('f-lot').value = project.lot;
+    document.getElementById('f-notes').value = project.notes || '';
+
+    document.getElementById('save-btn').innerHTML = '<span>✏️</span> Update Project';
+
+    closeModal('detail-modal');
+
+    // Scroll form into view
+    document.querySelector('.sidebar').scrollTop = 0;
+    showToast('info', 'Edit Mode', `Editing: ${project.pjm}`);
+}
+
+function exportCSV() {
+    if (projects.length === 0) {
+        showToast('warning', 'No Data', 'No projects to export');
+        return;
+    }
+
+    const headers = ['No','PJM Number','Project Title','Equipment','PIC',
+        'Start Date','Start Time','End Date','End Time',
+        'Sample Qty','Sample Lot','Notes','Status'];
+
+    const rows = projects.map(p => [
+        p.rowNum, p.pjm, p.title, p.equipment, p.pic,
+        p.startDate, p.startTime, p.endDate, p.endTime,
+        p.qty, p.lot, p.notes || '',
+        hasConflict(p) ? 'Conflict' : 'Active'
+    ]);
+
+    const csv = [headers, ...rows]
+        .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PJM_BuildPlan_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('success', 'Exported', 'CSV file downloaded');
+}
+
+// =============================================
+// CONFLICT VIEW
+// =============================================
+function renderConflicts() {
+    const container = document.getElementById('conflict-container');
+    const allConflicts = getAllConflicts();
+
+    document.getElementById('conflict-badge').textContent = allConflicts.length;
+
+    const equipConflicts = allConflicts.filter(c => c.type === 'Equipment');
+    const picConflicts = allConflicts.filter(c => c.type === 'PIC');
+
+    container.innerHTML = '';
+
+    // Summary cards
+    const summary = document.createElement('div');
+    summary.className = 'conflict-summary';
+    summary.innerHTML = `
+        <div class="summary-card">
+            <div class="summary-icon ${allConflicts.length > 0 ? 'red' : 'green'}">
+                ${allConflicts.length > 0 ? '⚠' : '✅'}
+            </div>
+            <div class="summary-info">
+                <h3>${allConflicts.length}</h3>
+                <p>Total Conflicts</p>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon red">🔧</div>
+            <div class="summary-info">
+                <h3>${equipConflicts.length}</h3>
+                <p>Equipment Conflicts</p>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon yellow">👤</div>
+            <div class="summary-info">
+                <h3>${picConflicts.length}</h3>
+                <p>PIC Conflicts</p>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon blue">📋</div>
+            <div class="summary-info">
+                <h3>${projects.length}</h3>
+                <p>Total Projects</p>
+            </div>
+        </div>
+    `;
+    container.appendChild(summary);
+
+    if (allConflicts.length === 0) {
+        container.innerHTML += `
+            <div class="no-conflict">
+                <div class="no-conflict-icon">✅</div>
+                <div class="no-conflict-title">No Conflicts Detected!</div>
+                <div class="no-conflict-desc">All equipment and PIC assignments are clear.</div>
+            </div>
+        `;
+        document.getElementById('tab-conflicts').querySelector('.tab-badge').className = 'tab-badge green';
+        return;
+    }
+
+    document.getElementById('tab-conflicts').querySelector('.tab-badge').className = 'tab-badge';
+
+    // Conflict cards
+    const title = document.createElement('div');
+    title.className = 'conflict-section-title';
+    title.innerHTML = `⚠ Conflict Details <span style="font-size:12px;font-weight:400;color:var(--text-dim)">(${allConflicts.length} found)</span>`;
+    container.appendChild(title);
+
+    allConflicts.forEach(c => {
+        const fmtDt = (d, t) => {
+            const dt = new Date(`${d}T${t}`);
+            return dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) + ' ' + t;
+        };
+
+        const card = document.createElement('div');
+        card.className = 'conflict-card';
+
+        // Calculate overlap duration
+        const overlapStart = new Date(Math.max(c.proj1.startDt, c.proj2.startDt));
+        const overlapEnd = new Date(Math.min(c.proj1.endDt, c.proj2.endDt));
+        const overlapH = Math.round((overlapEnd - overlapStart) / 3600000 * 10) / 10;
+
+        card.innerHTML = `
+            <div class="conflict-card-header">
+                <span class="conflict-type-badge ${c.type === 'Equipment' ? 'conflict-equipment' : 'conflict-pic'}">
+                    ${c.type === 'Equipment' ? '🔧' : '👤'} ${c.type}
+                </span>
+                <span class="conflict-resource">${c.resource}</span>
+                <span class="conflict-time-overlap">⏱ Overlap: ${overlapH}h</span>
+            </div>
+            <div class="conflict-card-body">
+                <div class="conflict-project" style="background:${c.proj1.color}22;border:1px solid ${c.proj1.color}44">
+                    <div class="conflict-project-pjm" style="color:${c.proj1.color}">${c.proj1.pjm}</div>
+                    <div class="conflict-project-title">${c.proj1.title}</div>
+                    <div class="conflict-project-time">▶ ${fmtDt(c.proj1.startDate, c.proj1.startTime)}</div>
+                    <div class="conflict-project-time">⏹ ${fmtDt(c.proj1.endDate, c.proj1.endTime)}</div>
+                </div>
+                <div class="conflict-vs">
+                    ⚡<br>VS
+                </div>
+                <div class="conflict-project" style="background:${c.proj2.color}22;border:1px solid ${c.proj2.color}44">
+                    <div class="conflict-project-pjm" style="color:${c.proj2.color}">${c.proj2.pjm}</div>
+                    <div class="conflict-project-title">${c.proj2.title}</div>
+                    <div class="conflict-project-time">▶ ${fmtDt(c.proj2.startDate, c.proj2.startTime)}</div>
+                    <div class="conflict-project-time">⏹ ${fmtDt(c.proj2.endDate, c.proj2.endTime)}</div>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+// =============================================
+// MODALS
+// =============================================
+function showProjectDetail(id) {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+
+    const conflict = hasConflict(project);
+    const fmtDt = (d, t) => {
+        const dt = new Date(`${d}T${t}`);
+        return dt.toLocaleDateString('en-GB', {
+            weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+        }) + ' — ' + t;
+    };
+
+    const duration = Math.round((project.endDt - project.startDt) / 3600000 * 10) / 10;
+
+    const header = document.getElementById('modal-header');
+    header.style.background = `linear-gradient(135deg, ${project.color}, ${darkenColor(project.color)})`;
+
+    document.getElementById('modal-title').textContent = `${project.pjm}`;
+    document.getElementById('modal-subtitle').textContent = project.title;
+
+    const conflicts = checkConflicts(project.equipment, project.pic,
+        project.startDt, project.endDt, project.id);
+
+    document.getElementById('modal-body').innerHTML = `
+        ${conflict ? `
+        <div class="conflict-warning" style="margin-bottom:16px">
+            <div class="conflict-warning-title">⚠ Conflict Detected</div>
+            ${conflicts.map(c => `
+                <div class="conflict-warning-item">
+                    ${c.type} conflict: "${c.resource}" also used in ${c.conflictWith.pjm}
+                </div>
+            `).join('')}
+        </div>` : ''}
+
+        <div class="detail-grid">
+            ${[
+                ['🔧 Equipment', project.equipment],
+                ['👤 Person in Charge', project.pic],
+                ['▶ Start', fmtDt(project.startDate, project.startTime)],
+                ['⏹ End', fmtDt(project.endDate, project.endTime)],
+                ['⏱ Duration', `${duration} hours`],
+                ['🧪 Sample Qty', project.qty],
+                ['📦 Sample Lot', project.lot],
+                ['📝 Notes', project.notes || '—'],
+                ['🏷 Status', conflict ? '⚠ Has Conflicts' : '✅ Active'],
+            ].map(([label, value]) => `
+                <div class="detail-row">
+                    <span class="detail-label">${label}</span>
+                    <span class="detail-value">${value}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    document.getElementById('modal-footer').innerHTML = `
+        <button class="btn btn-ghost" onclick="closeModal('detail-modal')">Close</button>
+        <button class="btn btn-ghost" onclick="editProject('${project.id}')"
+            style="color:#a5b4fc;border-color:#4c1d95">✏️ Edit</button>
+        <button class="btn btn-danger" onclick="deleteProject('${project.id}')">🗑 Delete</button>
+    `;
+
+    document.getElementById('detail-modal').classList.add('show');
+}
+
+function showConflictModal(conflicts) {
+    const content = document.getElementById('conflict-modal-content');
+    content.innerHTML = `
+        <div class="conflict-warning">
+            <div class="conflict-warning-title">⚠ ${conflicts.length} Conflict(s) Found</div>
+            ${conflicts.map(c => `
+                <div class="conflict-warning-item">
+                    <strong>${c.type} conflict</strong> — "${c.resource}" is already used in
+                    <strong>${c.conflictWith.pjm}</strong>
+                    (${c.conflictWith.startTime} – ${c.conflictWith.endTime})
+                </div>
+            `).join('')}
+        </div>
+    `;
+    document.getElementById('conflict-modal').classList.add('show');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) closeModal(overlay.id);
+    });
+});
+
+// =============================================
+// TABS
+// =============================================
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    document.getElementById(`tab-${name}`).classList.add('active');
+    document.getElementById(`tab-content-${name}`).classList.add('active');
+
+    if (name === 'calendar') renderCalendar();
+    if (name === 'list') renderTable();
+    if (name === 'conflicts') renderConflicts();
+}
+
+// =============================================
+// STATS & UPDATES
+// =============================================
+function updateStats() {
+    const allConflicts = getAllConflicts();
+    document.getElementById('stat-total').textContent = projects.length;
+    document.getElementById('stat-active').textContent =
+        projects.filter(p => !hasConflict(p)).length;
+    document.getElementById('stat-conflicts').textContent = allConflicts.length;
+}
+
+function updateCurrentDate() {
+    const now = new Date();
+    document.getElementById('current-date').textContent =
+        now.toLocaleDateString('en-GB', {
+            weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+        });
+}
+
+function refreshAll() {
+    renderCalendar();
+    renderTable();
+    renderConflicts();
+    updateStats();
+}
+
+// =============================================
+// TOAST NOTIFICATIONS
+// =============================================
+function showToast(type, title, message) {
+    const container = document.getElementById('toast-container');
+    const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type]}</span>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <div class="toast-msg">${message}</div>
+        </div>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+// =============================================
+// UTILITIES
+// =============================================
+function darkenColor(hex) {
+    hex = hex.replace('#', '');
+    let r = parseInt(hex.substr(0, 2), 16);
+    let g = parseInt(hex.substr(2, 2), 16);
+    let b = parseInt(hex.substr(4, 2), 16);
+    r = Math.floor(r * 0.65);
+    g = Math.floor(g * 0.65);
+    b = Math.floor(b * 0.65);
+    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+function truncate(str, max) {
+    return str.length > max ? str.substring(0, max) + '…' : str;
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.show').forEach(m => {
+            m.classList.remove('show');
+        });
+    }
+});
+</script>
+</body>
+</html>
