@@ -2058,36 +2058,66 @@ async function confirmDeleteUser() {
     if (!deletingUserId) return;
 
     const btn = document.getElementById("confirm-delete-user-btn");
-
-    // Find user before deletion for toast message
     const user = allUsers.find(u => u.id === deletingUserId);
 
+    // ── Guard: make sure dbAdmin exists ──────────────────
+    if (!window.dbAdmin) {
+        console.error("❌ window.dbAdmin is not initialized");
+        showToast("error", "Config Error", "Admin client not initialized. Check supabase-config.js");
+        return;
+    }
+
+    // ── Guard: make sure .from is a function ─────────────
+    if (typeof window.dbAdmin.from !== "function") {
+        console.error("❌ window.dbAdmin.from is not a function");
+        showToast("error", "Config Error", "Admin client broken. Check service role key.");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `Deleting...`;
+    }
+
     try {
-        // ── Soft delete — set is_active = false ────────────
-        // (Hard delete requires Supabase service role key)
-        const { error } = await window.db
+        // ── Step 1: Delete from public.users ──────────────
+        const { error: dbError } = await window.dbAdmin
             .from("users")
-            .update({
-                is_active : false,
-                updated_at: new Date().toISOString()
-            })
+            .delete()
             .eq("id", deletingUserId);
 
-        if (error) throw error;
+        if (dbError) throw dbError;
+        console.log("✅ Deleted from public.users");
+
+        // ── Step 2: Delete from Supabase Auth ─────────────
+        const { error: authError } = await window.dbAdmin
+            .auth
+            .admin
+            .deleteUser(deletingUserId);
+
+        if (authError) throw authError;
+        console.log("✅ Deleted from auth.users");
 
         closeAdminModal("delete-user-modal");
-        showToast("success", "User Deactivated",
-            `🚫 ${user?.name || "User"} has been deactivated`);
-
+        showToast(
+            "success",
+            "User Deleted",
+            `🗑️ ${user?.name || "User"} has been permanently deleted`
+        );
         deletingUserId = null;
         await fetchAllUsers();
 
     } catch (err) {
         console.error("confirmDeleteUser:", err.message);
         showToast("error", "Delete Failed", err.message);
+
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `Delete`;
+        }
     }
 }
-
 // ═══════════════════════════════════════════════════════════════
 // EXPORT USERS CSV
 // ═══════════════════════════════════════════════════════════════
