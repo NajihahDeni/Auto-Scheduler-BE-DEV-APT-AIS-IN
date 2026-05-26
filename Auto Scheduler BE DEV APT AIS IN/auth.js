@@ -340,7 +340,7 @@ async function handleLogin(event) {
         console.log("🔍 AUTH: STEP 8 — Redirecting in 1500ms...");
 
         setLoading(false);
-        showAlert("success", `✅ Welcome, ${displayName}! Redirecting…`);
+        showAlert("success", `Welcome, ${displayName}! Redirecting…`);
 
         redirectTimeout = setTimeout(function () {
             console.log("🔍 AUTH: STEP 8 — Redirect firing NOW →",
